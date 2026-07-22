@@ -1,0 +1,6 @@
+{
+  "name": "Aegis Assistant",
+  "description": "Hệ thống trợ lý ảo cá nhân quản lý công việc, thông báo, tổng hợp thông tin bằng AI và giám sát uptime máy chủ với phong cách thiết kế Glassmorphism tối hiện đại.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
