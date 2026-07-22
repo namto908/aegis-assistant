@@ -27,7 +27,8 @@ const DEFAULT_ASSISTANT: AssistantConfig = {
   name: "Aegis",
   prompt: "Bạn là Aegis, trợ lý ảo cá nhân đa năng rành công nghệ, tính cách lôi cuốn, tinh tế và luôn đặt bảo mật lên hàng đầu. Hãy trả lời ngắn gọn, thiết thực, có cấu trúc sử dụng Markdown nhẹ bằng Tiếng Việt.",
   avatarUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150",
-  themeColor: "slate"
+  themeColor: "slate",
+  apiBaseUrl: "http://192.168.2.200:3000"
 };
 
 export default function App() {
@@ -109,8 +110,15 @@ export default function App() {
       if (storedNotifications) setNotifications(JSON.parse(storedNotifications));
       else setNotifications(DEFAULT_NOTIFICATIONS);
 
-      if (storedAssistant) setAssistantConfig(JSON.parse(storedAssistant));
-      else setAssistantConfig(DEFAULT_ASSISTANT);
+      if (storedAssistant) {
+        const parsed = JSON.parse(storedAssistant);
+        if (!parsed.apiBaseUrl) {
+          parsed.apiBaseUrl = "http://192.168.2.200:3000";
+        }
+        setAssistantConfig(parsed);
+      } else {
+        setAssistantConfig(DEFAULT_ASSISTANT);
+      }
     } catch (e) {
       console.error("Local Storage Load Error:", e);
       setTasks(DEFAULT_TASKS);

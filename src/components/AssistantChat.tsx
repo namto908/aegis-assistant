@@ -97,7 +97,7 @@ HƯỚNG DẪN TRẢ LỜI:
         content: m.content,
       }));
 
-      const apiBase = assistantConfig.apiBaseUrl ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "";
+      const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:3000";
       
       const controller = new AbortController();
       const response = await fetch(`${apiBase}/api/gemini/chat`, {
