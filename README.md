@@ -103,17 +103,17 @@ npm install
 npm run dev
 ```
 
-### 2. Biên Dịch Android APK
+### 2. Biên Dịch Android APK (Tùy Chọn)
 ```bash
-# 1. Build bản bundle web và sync với Capacitor
+# 1. Khởi tạo platform Android local (nếu chưa có thư mục android)
+npx cap add android
+
+# 2. Build bản bundle web và sync với Capacitor
 npm run build && npx cap sync
 
-# 2. Biên dịch APK Debug bằng Gradle
+# 3. Biên dịch APK Debug bằng Gradle
 cd android
 ./gradlew assembleDebug
-
-# Tệp APK sau khi build nằm tại:
-# android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
 ---
