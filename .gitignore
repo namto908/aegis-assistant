@@ -4,6 +4,10 @@ node_modules/
 # Production build outputs
 dist/
 build/
+*.apk
+
+# Capacitor / Android Native Build Folder
+android/
 
 # Logs
 *.log
@@ -29,11 +33,3 @@ yarn-error.log*
 # OS System Files
 .DS_Store
 Thumbs.db
-
-# Capacitor / Android Build Artifacts
-android/app/build/
-android/build/
-android/.gradle/
-android/captures/
-android/.idea/
-android/local.properties
