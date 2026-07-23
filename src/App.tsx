@@ -35,8 +35,6 @@ const DEFAULT_ASSISTANT: AssistantConfig = {
 
 export default function App() {
   const [user, setUser] = useState<GoogleUser | null>(null);
-  const [mockName, setMockName] = useState("Nam");
-  const [mockEmail, setMockEmail] = useState("dev1@aegis.com");
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [servers, setServers] = useState<ServerStatus[]>([]);
@@ -136,23 +134,7 @@ export default function App() {
     }
   };
 
-  const handleMockLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mockName.trim() || !mockEmail.trim()) {
-      alert("Vui lòng điền tên và email.");
-      return;
-    }
-    const mockUser: GoogleUser = {
-      id: `google_mock_${mockEmail.replace("@", "_").replace(".", "_")}`,
-      email: mockEmail.trim(),
-      name: mockName.trim(),
-      picture: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
-      idToken: `mock_user_token_dev_${mockName.trim().replace(/\s+/g, "")}_${mockEmail.trim()}`
-    };
-    localStorage.setItem("aegis_user", JSON.stringify(mockUser));
-    setUser(mockUser);
-    fetchUserData(mockUser);
-  };
+
 
   const handleLogout = () => {
     GoogleAuth.signOut().catch(() => {});
@@ -437,73 +419,40 @@ export default function App() {
   // Render proper screen content
   const renderLoginScreen = () => {
     return (
-      <div className="w-full max-w-sm p-6 rounded-[32px] border border-white/10 bg-slate-900/80 backdrop-blur-2xl shadow-2xl flex flex-col items-center justify-center space-y-5 text-center animate-in fade-in zoom-in duration-350 z-50">
+      <div className="w-full max-w-sm p-8 rounded-[32px] border border-white/10 bg-slate-900/80 backdrop-blur-2xl shadow-2xl flex flex-col items-center justify-center space-y-6 text-center animate-in fade-in zoom-in duration-350 z-50">
         <div className="relative">
-          <div className="w-16 h-16 rounded-full bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-pulse">
-            <Shield className="text-cyan-400 fill-cyan-400/10" size={28} />
+          <div className="w-20 h-20 rounded-full bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20 shadow-[0_0_25px_rgba(6,182,212,0.2)] animate-pulse">
+            <Shield className="text-cyan-400 fill-cyan-400/10" size={36} />
           </div>
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-cyan-400 rounded-full flex items-center justify-center animate-bounce">
-            <Sparkles size={8} className="text-slate-950" />
+          <div className="absolute -top-1 -right-1 w-5 h-5 bg-cyan-400 rounded-full flex items-center justify-center animate-bounce">
+            <Sparkles size={10} className="text-slate-950" />
           </div>
         </div>
 
-        <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">AEGIS ASSISTANT</h2>
-          <p className="text-xs text-slate-400 mt-1">Hệ thống Trợ lý ảo & Bảo mật Cá nhân</p>
+        <div className="space-y-1">
+          <h2 className="text-2xl font-bold text-white tracking-tight font-display">AEGIS ASSISTANT</h2>
+          <p className="text-xs text-slate-400 max-w-[240px]">Hệ thống Trợ lý ảo & Bảo mật Quản trị Hệ thống Cá nhân</p>
         </div>
 
-        {/* Primary Google Login Button */}
-        <button 
-          onClick={handleGoogleLogin}
-          className="w-full py-3.5 px-4 rounded-2xl border border-white/15 bg-gradient-to-r from-white/10 to-white/5 hover:from-white/15 hover:to-white/10 text-white font-semibold text-sm shadow-xl active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-3 group"
-        >
-          <svg className="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
-            <path fill="#EA4335" d="M12 5.04c1.78 0 3.38.61 4.64 1.8l3.46-3.46C17.99 1.19 15.15 0 12 0 7.31 0 3.25 2.69 1.18 6.63l4.03 3.12C6.18 7.02 8.85 5.04 12 5.04z" />
-            <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.28 1.48-1.12 2.74-2.38 3.58l3.69 2.87c2.16-1.99 3.42-4.92 3.42-8.6z" />
-            <path fill="#FBBC05" d="M5.21 14.77c-.24-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27L1.18 7.11C.43 8.58 0 10.24 0 12s.43 3.42 1.18 4.89l4.03-3.12z" />
-            <path fill="#34A853" d="M12 24c3.24 0 5.97-1.07 7.96-2.91l-3.69-2.87c-1.02.68-2.33 1.09-3.96 1.09-3.15 0-5.82-1.98-6.78-4.71L1.49 17.72C3.56 21.31 7.31 24 12 24z" />
-          </svg>
-          <span>Đăng nhập bằng Google</span>
-        </button>
-
-        {/* Divider */}
-        <div className="w-full flex items-center justify-between text-[10px] text-slate-500 font-medium px-2 pt-1">
-          <div className="h-[1px] bg-white/5 flex-1"></div>
-          <span className="px-3 uppercase tracking-wider">Hoặc sử dụng Dev Mode</span>
-          <div className="h-[1px] bg-white/5 flex-1"></div>
-        </div>
-
-        {/* Secondary Developer Form */}
-        <form onSubmit={handleMockLogin} className="w-full space-y-2.5">
-          <div className="space-y-1 text-left">
-            <input 
-              type="text" 
-              value={mockName}
-              onChange={(e) => setMockName(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 transition"
-              placeholder="Tên (VD: Nam)"
-              required
-            />
-          </div>
-          <div className="space-y-1 text-left">
-            <input 
-              type="email" 
-              value={mockEmail}
-              onChange={(e) => setMockEmail(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 transition font-mono"
-              placeholder="Email (VD: dev@aegis.com)"
-              required
-            />
-          </div>
-
+        <div className="w-full pt-2">
+          {/* Primary Google Login Button */}
           <button 
-            type="submit" 
-            className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 font-medium text-xs active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-1.5"
+            onClick={handleGoogleLogin}
+            className="w-full py-4 px-4 rounded-2xl border border-white/20 bg-gradient-to-r from-white/15 via-white/10 to-white/5 hover:from-white/20 hover:to-white/15 text-white font-bold text-sm shadow-2xl active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-3 group"
           >
-            <LogIn size={12} />
-            Đăng nhập Thử nghiệm
+            <svg className="w-5 h-5 transition-transform group-hover:scale-110" viewBox="0 0 24 24">
+              <path fill="#EA4335" d="M12 5.04c1.78 0 3.38.61 4.64 1.8l3.46-3.46C17.99 1.19 15.15 0 12 0 7.31 0 3.25 2.69 1.18 6.63l4.03 3.12C6.18 7.02 8.85 5.04 12 5.04z" />
+              <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.28 1.48-1.12 2.74-2.38 3.58l3.69 2.87c2.16-1.99 3.42-4.92 3.42-8.6z" />
+              <path fill="#FBBC05" d="M5.21 14.77c-.24-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27L1.18 7.11C.43 8.58 0 10.24 0 12s.43 3.42 1.18 4.89l4.03-3.12z" />
+              <path fill="#34A853" d="M12 24c3.24 0 5.97-1.07 7.96-2.91l-3.69-2.87c-1.02.68-2.33 1.09-3.96 1.09-3.15 0-5.82-1.98-6.78-4.71L1.49 17.72C3.56 21.31 7.31 24 12 24z" />
+            </svg>
+            <span>Đăng nhập bằng Google</span>
           </button>
-        </form>
+        </div>
+
+        <p className="text-[10px] text-slate-500 leading-relaxed max-w-[220px]">
+          Xác thực an toàn tuyệt đối qua Google OAuth 2.0. Dữ liệu & Trí nhớ AI được bảo mật theo tài khoản.
+        </p>
       </div>
     );
   };
