@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Send, Sparkles, AlertTriangle, User, Bot, Loader2, 
-  Image as ImageIcon, X, Trash2, Brain, Cpu, Plus, Check, RefreshCw, FileCode, Paperclip
+  Image as ImageIcon, X, Trash2, Brain, Cpu, Plus, Check, RefreshCw, FileCode, Paperclip, MessageSquarePlus
 } from "lucide-react";
 import { Message, AssistantConfig, Task, ServerStatus } from "../types";
 import { getThemeClasses } from "../lib/theme";
@@ -429,15 +429,14 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
             <span className="hidden sm:inline text-[10px] font-bold">Trí nhớ</span>
           </button>
 
-          {messages.length > 1 && (
-            <button
-              onClick={handleClearHistory}
-              className="p-1.5 text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition text-xs flex items-center gap-1 border border-transparent hover:border-rose-500/20 cursor-pointer"
-              title="Xóa lịch sử cuộc trò chuyện"
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
+          <button
+            onClick={handleClearHistory}
+            className={`p-1.5 ${theme.bgMuted} hover:bg-rose-500/20 hover:text-rose-200 text-slate-300 rounded-lg transition text-xs flex items-center gap-1 border border-white/10 cursor-pointer shadow`}
+            title="Khởi tạo phiên trò chuyện mới"
+          >
+            <MessageSquarePlus size={14} />
+            <span className="hidden sm:inline text-[10px] font-bold">Phiên mới</span>
+          </button>
         </div>
       </div>
 
