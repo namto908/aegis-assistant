@@ -6,14 +6,14 @@
   --font-mono: "Fira Code", ui-monospace, SFMono-Regular, monospace;
   --font-display: "Roboto", sans-serif;
 
-  /* Redefine text sizes to make them tighter and smaller across the entire app */
-  --text-2xs: 8px;
-  --text-xs: 10.5px;
-  --text-sm: 11.5px;
-  --text-base: 12.5px;
-  --text-lg: 14px;
-  --text-xl: 16px;
-  --text-2xl: 18px;
+  /* Redefine text sizes to make them slightly larger for better readability */
+  --text-2xs: 9.5px;
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-lg: 15.5px;
+  --text-xl: 18px;
+  --text-2xl: 20px;
 }
 
 /* Glassmorphism custom classes */

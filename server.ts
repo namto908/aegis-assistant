@@ -41,17 +41,38 @@ app.post("/api/gemini/chat", async (req, res) => {
 
     const ai = getGeminiClient();
 
-    // Map message roles for Gemini ('user' and 'model' only)
-    const formattedContents = messages.map((m: any) => ({
-      role: m.role === "assistant" || m.role === "model" ? "model" : "user",
-      parts: [{ text: m.content || "" }],
-    }));
+    // Map message roles and image parts for Gemini ('user' and 'model')
+    const formattedContents = messages.map((m: any) => {
+      const parts: any[] = [];
+      if (m.image) {
+        const match = m.image.match(/^data:(image\/\w+);base64,(.+)$/);
+        if (match) {
+          parts.push({
+            inlineData: {
+              mimeType: match[1],
+              data: match[2],
+            },
+          });
+        }
+      }
+      if (m.content) {
+        parts.push({ text: m.content });
+      } else if (parts.length === 0) {
+        parts.push({ text: "" });
+      }
+      return {
+        role: m.role === "assistant" || m.role === "model" ? "model" : "user",
+        parts,
+      };
+    });
+
+    const defaultInstruction = "Bạn là Aegis, trợ lý ảo đa năng quản lý hệ thống cá nhân của người dùng. Hãy trả lời thân thiện, hữu ích và ngắn gọn bằng Tiếng Việt. Nếu người dùng cần đính kèm ảnh minh họa hoặc bạn muốn minh họa bằng hình ảnh sơ đồ/công nghệ/máy chủ, hãy nhúng link ảnh bằng định dạng Markdown ![Mô tả](url).";
 
     const response = await ai.models.generateContent({
       model: "gemini-3.5-flash",
       contents: formattedContents,
       config: {
-        systemInstruction: systemInstruction || "Bạn là Aegis, trợ lý ảo đa năng quản lý hệ thống cá nhân của người dùng. Hãy trả lời thân thiện, hữu ích và ngắn gọn bằng Tiếng Việt.",
+        systemInstruction: systemInstruction || defaultInstruction,
         temperature: 0.7,
       },
     });

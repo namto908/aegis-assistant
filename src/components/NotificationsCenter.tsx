@@ -38,7 +38,7 @@ export default function NotificationsCenter({
     return localStorage.getItem("aegis_news_time") || "07:00";
   });
   const [topic, setTopic] = useState<"hacker-news" | "ai-news" | "system-summary" | "custom">(() => {
-    return (localStorage.getItem("aegis_news_topic") as any) || "hacker-news";
+    return (localStorage.getItem("aegis_news_topic") as any) || "custom";
   });
   const [customTopic, setCustomTopic] = useState<string>(() => {
     return localStorage.getItem("aegis_news_custom_topic") || "Trí tuệ nhân tạo, Máy chủ Linux & Android 16";
@@ -342,10 +342,10 @@ export default function NotificationsCenter({
           </button>
         </div>
 
-        {/* Time Picker & Timezone Info */}
+        {/* Custom Push Time Selection */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-950/50 p-2.5 rounded-xl border border-white/5">
           <div className="flex items-center gap-2">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Giờ đẩy bản tin:</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thời gian đẩy:</label>
             <input 
               type="time" 
               value={scheduleTime}
@@ -360,47 +360,18 @@ export default function NotificationsCenter({
           </div>
         </div>
 
-        {/* Topic selector */}
+        {/* Custom News Content / Topic Prompt Field */}
         <div className="space-y-1.5">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-display">Chủ đề sở thích cá nhân</label>
-          <div className="grid grid-cols-2 gap-1.5">
-            {[
-              { id: "hacker-news", label: "Hacker News", desc: "Tin công nghệ toàn cầu" },
-              { id: "ai-news", label: "Tin tức AI & LLM", desc: "Xu hướng Gemini/GPT" },
-              { id: "system-summary", label: "Aegis System", desc: "Báo cáo máy chủ & task" },
-              { id: "custom", label: "Tùy chỉnh riêng", desc: "Nhập sở thích cá nhân" }
-            ].map((s) => (
-              <button
-                key={s.id}
-                disabled={loading}
-                onClick={() => setTopic(s.id as any)}
-                className={`p-2 rounded-xl text-left border cursor-pointer transition flex flex-col justify-between ${
-                  topic === s.id 
-                    ? `${theme.bgMuted} ${theme.border} text-white ${theme.shadow}` 
-                    : "bg-white/5 border-transparent text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <span className="text-[10px] font-bold block truncate">{s.label}</span>
-                <span className="text-[8px] opacity-75">{s.desc}</span>
-              </button>
-            ))}
-          </div>
+          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-display">Bản tin cần đẩy (Nội dung & Chủ đề)</label>
+          <textarea 
+            rows={2}
+            value={customTopic}
+            onChange={(e) => setCustomTopic(e.target.value)}
+            placeholder="Nhập nội dung/chủ đề bản tin cần đẩy. Ví dụ: Tin tức AI mới nhất, Công nghệ Linux, Giá Bitcoin, Cập nhật máy chủ Aegis..."
+            className={`w-full bg-slate-950/70 border border-white/15 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:${theme.border} transition font-sans resize-none`}
+            disabled={loading}
+          />
         </div>
-
-        {/* Custom topic prompt input field */}
-        {topic === "custom" && (
-          <div className="space-y-1.5 animate-in fade-in slide-in-from-top-1 duration-155">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-display">Sở thích cá nhân / Từ khóa đẩy tin</label>
-            <textarea 
-              rows={2}
-              value={customTopic}
-              onChange={(e) => setCustomTopic(e.target.value)}
-              placeholder="Nhập sở thích của bạn. Ví dụ: Tin nóng Bitcoin, Trí tuệ nhân tạo, Máy chủ Linux Nginx, Android 16..."
-              className={`w-full bg-slate-950/70 border border-white/15 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:${theme.border} transition font-sans resize-none`}
-              disabled={loading}
-            />
-          </div>
-        )}
 
         {/* Action Button & Scrollable Log Display Box */}
         {loading ? (
