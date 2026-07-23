@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
-import { motion } from "motion/react";
-import { Send, Sparkles, AlertTriangle, User, Bot, Loader2, Image as ImageIcon, X, Trash2, Maximize2 } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
+import { 
+  Send, Sparkles, AlertTriangle, User, Bot, Loader2, 
+  Image as ImageIcon, X, Trash2, Brain, Cpu, Plus, Check, RefreshCw
+} from "lucide-react";
 import { Message, AssistantConfig, Task, ServerStatus } from "../types";
 import { getThemeClasses } from "../lib/theme";
 
@@ -13,6 +16,15 @@ interface AssistantChatProps {
   clearPrefillMessage?: () => void;
 }
 
+interface UserMemory {
+  id: str;
+  category: str;
+  key: str;
+  value: str;
+  confidence: number;
+  updated_at: str;
+}
+
 export default function AssistantChat({ 
   assistantConfig, 
   tasks, 
@@ -22,20 +34,52 @@ export default function AssistantChat({
   clearPrefillMessage
 }: AssistantChatProps) {
   const theme = getThemeClasses(assistantConfig.themeColor || "slate");
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: "model",
-      content: `Xin chào! Tôi là **${assistantConfig.name}**, trợ lý ảo cá nhân được cấu hình riêng cho bạn.\n\nTôi sẵn sàng hỗ trợ kiểm tra công việc, theo dõi máy chủ và giải đáp mọi thắc mắc. Bạn có thể gửi câu hỏi hoặc **đính kèm hình ảnh** để tôi phân tích nhé!`,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  const defaultWelcomeMsg: Message = {
+    role: "model",
+    content: `Xin chào! Tôi là **${assistantConfig.name}**, trợ lý ảo cá nhân được cấu hình riêng cho bạn.\n\nTôi được tích hợp bộ nhớ học hỏi theo thời gian (**Hermes Memory Engine**). Tôi sẽ tự động ghi nhớ sở thích, môi trường công nghệ và các nguyên tắc của bạn qua từng cuộc đối thoại!`,
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+
+  const [messages, setMessages] = useState<Message[]>([defaultWelcomeMsg]);
   const [inputValue, setInputValue] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [isTyping, setIsTyping] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   
+  // Hermes Memory Store Modal state
+  const [showMemoryModal, setShowMemoryModal] = useState(false);
+  const [memories, setMemories] = useState<UserMemory[]>([]);
+  const [loadingMemories, setLoadingMemories] = useState(false);
+  const [newMemKey, setNewMemKey] = useState("");
+  const [newMemVal, setNewMemVal] = useState("");
+
   const chatEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:3000";
+
+  // Load chat history from DB on mount
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        const res = await fetch(`${apiBase}/api/gemini/history`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data) && data.length > 0) {
+            setMessages(data.map((m: any) => ({
+              role: m.role,
+              content: m.content,
+              timestamp: m.timestamp,
+              image: m.image
+            })));
+          }
+        }
+      } catch (err) {
+        console.log("Could not load backend chat history", err);
+      }
+    };
+    fetchHistory();
+  }, [apiBase]);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -57,8 +101,67 @@ export default function AssistantChat({
     "Tóm tắt công việc của tôi",
     "Trạng thái Server thế nào?",
     "Hạn chót các Task sắp tới",
-    "Phân tích hệ thống & hình ảnh",
+    "Ghi nhớ: Tôi thích dùng Linux Ubuntu & Docker",
   ];
+
+  // Fetch Hermes memories from backend
+  const fetchMemories = async () => {
+    setLoadingMemories(true);
+    try {
+      const res = await fetch(`${apiBase}/api/gemini/memories`);
+      if (res.ok) {
+        const data = await res.json();
+        setMemories(data);
+      }
+    } catch (e) {
+      console.error("Failed to load memories", e);
+    } finally {
+      setLoadingMemories(false);
+    }
+  };
+
+  const handleOpenMemoryModal = () => {
+    setShowMemoryModal(true);
+    fetchMemories();
+  };
+
+  const handleAddMemory = async () => {
+    if (!newMemKey.trim() || !newMemVal.trim()) return;
+    try {
+      const res = await fetch(`${apiBase}/api/gemini/memories`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: newMemKey.trim(), value: newMemVal.trim(), category: "preference" })
+      });
+      if (res.ok) {
+        setNewMemKey("");
+        setNewMemVal("");
+        fetchMemories();
+      }
+    } catch (e) {
+      console.error("Failed to add memory", e);
+    }
+  };
+
+  const handleDeleteMemory = async (id: string) => {
+    try {
+      const res = await fetch(`${apiBase}/api/gemini/memories/${id}`, { method: "DELETE" });
+      if (res.ok) {
+        setMemories((prev) => prev.filter((m) => m.id !== id));
+      }
+    } catch (e) {
+      console.error("Failed to delete memory", e);
+    }
+  };
+
+  const handleClearHistory = async () => {
+    setMessages([defaultWelcomeMsg]);
+    try {
+      await fetch(`${apiBase}/api/gemini/history`, { method: "DELETE" });
+    } catch (e) {
+      console.error("Failed to clear history on backend", e);
+    }
+  };
 
   // Image Selection Handler
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -95,7 +198,6 @@ export default function AssistantChat({
       image: selectedImage || undefined,
     };
 
-    const imageForApi = selectedImage;
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
     setSelectedImage(null);
@@ -129,8 +231,6 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
         image: m.image,
       }));
 
-      const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:3000";
-      
       const controller = new AbortController();
       const response = await fetch(`${apiBase}/api/gemini/chat`, {
         method: "POST",
@@ -164,7 +264,7 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
       
       const fallbackMsg: Message = {
         role: "model",
-        content: `Tôi đã nhận được yêu cầu "${text}".\n\n* **Tiến độ:** Bạn có ${tasks.filter(t => !t.completed).length} công việc chưa hoàn thành.\n* **Server:** Ghi nhận ${servers.filter(s => s.status === 'up').length}/${servers.length} máy chủ đang hoạt động.\n\n*Lưu ý: Để bật AI hoàn chỉnh kèm phân tích hình ảnh, hãy kiểm tra kết nối server backend và GEMINI_API_KEY.*`,
+        content: `Tôi đã nhận được yêu cầu "${text}".\n\n* **Tiến độ:** Bạn có ${tasks.filter(t => !t.completed).length} công việc chưa hoàn thành.\n* **Server:** Ghi nhận ${servers.filter(s => s.status === 'up').length}/${servers.length} máy chủ đang hoạt động.\n\n*Lưu ý: Để bật AI hoàn chỉnh kèm bộ nhớ học hỏi Hermes Memory, hãy đảm bảo server backend đang khởi chạy.*`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, fallbackMsg]);
@@ -177,7 +277,6 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
   const renderFormattedContent = (content: string) => {
     if (!content) return null;
 
-    // Clean up standalone raw *** lines or converts them into clean dividers
     const cleanContent = content.replace(/^\s*\*\*\*\s*$/gm, "---");
 
     const lines = cleanContent.split("\n");
@@ -222,9 +321,8 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
         );
       }
 
-      // Format inline elements (bold **, inline code `, italic *)
+      // Format inline elements
       const parseInline = (text: string) => {
-        // Split by bold ** or ***
         const parts = text.split(/(\*\*\*[\s\S]*?\*\*\*|\*\*[\s\S]*?\*\*|`[\s\S]*?`)/g);
         return parts.map((part, idx) => {
           if (part.startsWith("***") && part.endsWith("***") && part.length > 6) {
@@ -284,26 +382,37 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
             <div className="flex items-center gap-2">
               <h2 className="text-sm font-bold text-white font-display tracking-wide">{assistantConfig.name}</h2>
               <span className={`text-[9px] px-2 py-0.5 rounded-full ${theme.bgMuted} ${theme.text} font-mono border ${theme.borderMuted}`}>
-                Gemini 3.5 Multimodal
+                Hermes Memory Active
               </span>
             </div>
             <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1 mt-0.5">
               <Sparkles size={10} className={`${theme.text} animate-pulse`} /> 
-              Trợ lý trí tuệ nhân tạo • Phân tích văn bản & hình ảnh
+              Trợ lý trí tuệ • Tự động học hỏi sở thích theo thời gian
             </p>
           </div>
         </div>
 
-        {/* Clear Chat Button */}
-        {messages.length > 1 && (
+        {/* Action Buttons */}
+        <div className="flex items-center gap-1.5">
           <button
-            onClick={() => setMessages(messages.slice(0, 1))}
-            className="p-1.5 text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition text-xs flex items-center gap-1 border border-transparent hover:border-rose-500/20 cursor-pointer"
-            title="Xóa cuộc trò chuyện"
+            onClick={handleOpenMemoryModal}
+            className={`p-1.5 ${theme.bgMuted} hover:bg-white/10 ${theme.text} hover:text-white rounded-lg transition text-xs flex items-center gap-1 border ${theme.borderMuted} cursor-pointer shadow`}
+            title="Xem trí nhớ về chủ nhân (Hermes Memory)"
           >
-            <Trash2 size={13} />
+            <Brain size={14} />
+            <span className="hidden sm:inline text-[10px] font-bold">Trí nhớ</span>
           </button>
-        )}
+
+          {messages.length > 1 && (
+            <button
+              onClick={handleClearHistory}
+              className="p-1.5 text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 rounded-lg transition text-xs flex items-center gap-1 border border-transparent hover:border-rose-500/20 cursor-pointer"
+              title="Xóa lịch sử cuộc trò chuyện"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Messages Scroll Area */}
@@ -440,7 +549,7 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
 
         <input
           type="text"
-          placeholder={selectedImage ? "Nhập câu hỏi về hình ảnh này..." : "Hỏi trợ lý ảo hoặc yêu cầu phân tích..."}
+          placeholder={selectedImage ? "Nhập câu hỏi về hình ảnh này..." : "Hỏi trợ lý ảo hoặc chia sẻ sở thích cá nhân..."}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
@@ -463,6 +572,120 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
           <AlertTriangle size={11} /> {apiError}
         </p>
       )}
+
+      {/* Hermes Memory Inspector Modal */}
+      <AnimatePresence>
+        {showMemoryModal && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-slate-900 border border-white/15 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]"
+            >
+              {/* Modal Header */}
+              <div className="p-4 border-b border-white/10 flex items-center justify-between bg-slate-950/50">
+                <div className="flex items-center gap-2">
+                  <div className={`p-1.5 ${theme.bgMuted} ${theme.text} rounded-lg border ${theme.borderMuted}`}>
+                    <Brain size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-white font-display">Bộ nhớ Tri thức Cá nhân (Hermes Memory)</h3>
+                    <p className="text-[10px] text-slate-400">Các đặc điểm & thông tin Aegis tự động học được từ bạn</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowMemoryModal(false)}
+                  className="p-1 text-slate-400 hover:text-white rounded-lg transition"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Memory Form / Manual Add */}
+              <div className="p-3 bg-slate-950/30 border-b border-white/5 space-y-2">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Thêm ghi nhớ thủ công:</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <input
+                    type="text"
+                    placeholder="Tên ghi nhớ (VD: Môi trường OS)"
+                    value={newMemKey}
+                    onChange={(e) => setNewMemKey(e.target.value)}
+                    className="bg-slate-900 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Nội dung (VD: Ubuntu 24.04, Python 3.12)"
+                    value={newMemVal}
+                    onChange={(e) => setNewMemVal(e.target.value)}
+                    className="bg-slate-900 border border-white/15 rounded-lg px-2.5 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                  />
+                </div>
+                <button
+                  onClick={handleAddMemory}
+                  disabled={!newMemKey.trim() || !newMemVal.trim()}
+                  className={`w-full py-1.5 ${theme.bgMuted} hover:bg-white/10 ${theme.text} disabled:opacity-40 rounded-lg text-xs font-bold border ${theme.borderMuted} flex items-center justify-center gap-1 cursor-pointer transition`}
+                >
+                  <Plus size={13} /> Ghi nhớ thông tin này
+                </button>
+              </div>
+
+              {/* Memory List */}
+              <div className="p-4 flex-1 overflow-y-auto space-y-2.5 no-scrollbar">
+                {loadingMemories ? (
+                  <div className="flex items-center justify-center py-8 text-xs text-slate-400 gap-2">
+                    <Loader2 size={16} className="animate-spin text-cyan-400" />
+                    <span>Đang nạp bộ nhớ tri thức...</span>
+                  </div>
+                ) : memories.length === 0 ? (
+                  <div className="text-center py-8 space-y-1">
+                    <Brain size={28} className="mx-auto text-slate-600 mb-2" />
+                    <p className="text-xs text-slate-300 font-bold">Chưa có ký ức nào được ghi nhận</p>
+                    <p className="text-[10px] text-slate-500 max-w-xs mx-auto">
+                      Hãy trò chuyện và chia sẻ với Aegis. Trợ lý sẽ tự động trích xuất sở thích và thông tin cá nhân của bạn vào đây!
+                    </p>
+                  </div>
+                ) : (
+                  memories.map((m) => (
+                    <div 
+                      key={m.id} 
+                      className="p-3 bg-slate-950/60 rounded-xl border border-white/10 flex items-start justify-between gap-3 hover:border-white/20 transition"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 font-mono border border-cyan-500/20 uppercase font-bold">
+                            {m.category}
+                          </span>
+                          <span className="text-xs font-bold text-white">{m.key}</span>
+                        </div>
+                        <p className="text-xs text-slate-300">{m.value}</p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteMemory(m.id)}
+                        className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition shrink-0 cursor-pointer"
+                        title="Xóa ghi nhớ"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="p-3 bg-slate-950/80 border-t border-white/10 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                <span>Tổng số ghi nhớ: {memories.length}</span>
+                <button
+                  onClick={fetchMemories}
+                  className="flex items-center gap-1 text-slate-300 hover:text-white cursor-pointer"
+                >
+                  <RefreshCw size={11} /> Làm mới
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
