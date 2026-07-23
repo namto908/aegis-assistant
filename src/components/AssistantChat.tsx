@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Message, AssistantConfig, Task, ServerStatus, GoogleUser } from "../types";
 import { getThemeClasses } from "../lib/theme";
+import { Capacitor } from "@capacitor/core";
 
 interface AssistantChatProps {
   assistantConfig: AssistantConfig;
@@ -88,7 +89,11 @@ export default function AssistantChat({
     return () => clearInterval(interval);
   }, [isTyping]);
 
-  const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:25530";
+  const isNative = Capacitor.isNativePlatform();
+  const rawUrl = assistantConfig.apiBaseUrl;
+  const apiBase = (rawUrl && rawUrl.trim() !== "" && !(isNative && (rawUrl.includes("localhost") || rawUrl.includes("127.0.0.1"))))
+    ? rawUrl.replace(/\/$/, "")
+    : "http://192.168.2.200:25530";
 
   // Load chat history from DB on mount
   useEffect(() => {
