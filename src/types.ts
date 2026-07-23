@@ -50,4 +50,6 @@ export interface Message {
   content: string;
   timestamp: string;
   image?: string;
+  file?: string;
+  fileName?: string;
 }

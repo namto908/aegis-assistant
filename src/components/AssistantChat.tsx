@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Send, Sparkles, AlertTriangle, User, Bot, Loader2, 
-  Image as ImageIcon, X, Trash2, Brain, Cpu, Plus, Check, RefreshCw
+  Image as ImageIcon, X, Trash2, Brain, Cpu, Plus, Check, RefreshCw, FileCode, Paperclip
 } from "lucide-react";
 import { Message, AssistantConfig, Task, ServerStatus } from "../types";
 import { getThemeClasses } from "../lib/theme";
@@ -43,6 +43,11 @@ export default function AssistantChat({
   const [messages, setMessages] = useState<Message[]>([defaultWelcomeMsg]);
   const [inputValue, setInputValue] = useState("");
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  
+  // Custom File attachments states
+  const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+
   const [isTyping, setIsTyping] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   
@@ -54,6 +59,7 @@ export default function AssistantChat({
   const [newMemVal, setNewMemVal] = useState("");
 
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:3000";
@@ -70,7 +76,9 @@ export default function AssistantChat({
               role: m.role,
               content: m.content,
               timestamp: m.timestamp,
-              image: m.image
+              image: m.image,
+              file: m.file,
+              fileName: m.fileName
             })));
           }
         }
@@ -84,7 +92,7 @@ export default function AssistantChat({
   // Auto scroll to bottom
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isTyping, selectedImage]);
+  }, [messages, isTyping, selectedImage, selectedFile]);
 
   // Handle message prefilling from other tabs
   useEffect(() => {
@@ -95,14 +103,6 @@ export default function AssistantChat({
       }
     }
   }, [prefillMessage]);
-
-  // Quick action suggestions
-  const suggestions = [
-    "Tóm tắt công việc của tôi",
-    "Trạng thái Server thế nào?",
-    "Hạn chót các Task sắp tới",
-    "Ghi nhớ: Tôi thích dùng Linux Ubuntu & Docker",
-  ];
 
   // Fetch Hermes memories from backend
   const fetchMemories = async () => {
@@ -187,20 +187,44 @@ export default function AssistantChat({
     e.target.value = "";
   };
 
+  // File Upload Selection Handler
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 8 * 1024 * 1024) {
+      setApiError("Dung lượng tập tin vượt quá 8MB. Vui lòng chọn tập tin nhỏ hơn.");
+      return;
+    }
+
+    setSelectedFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setSelectedFile(reader.result as string);
+      setApiError(null);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
   const handleSendMessage = async (textToSend?: string) => {
     const text = textToSend !== undefined ? textToSend : inputValue;
-    if (!text.trim() && !selectedImage) return;
+    if (!text.trim() && !selectedImage && !selectedFile) return;
 
     const userMsg: Message = {
       role: "user",
       content: text,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       image: selectedImage || undefined,
+      file: selectedFile || undefined,
+      fileName: selectedFileName || undefined,
     };
 
     setMessages((prev) => [...prev, userMsg]);
     setInputValue("");
     setSelectedImage(null);
+    setSelectedFile(null);
+    setSelectedFileName(null);
     setIsTyping(true);
     setApiError(null);
 
@@ -218,7 +242,7 @@ ${JSON.stringify(servers.map(s => ({ name: s.name, status: s.status, uptime: s.u
 
 HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
 - Xưng hô thân thiện, chuyên nghiệp, gọi chủ nhân là "chủ nhân", "bạn" hoặc "anh/chị", xưng là "${assistantConfig.name}" hoặc "em".
-- Nếu chủ nhân gửi hình ảnh, hãy phân tích kỹ các chi tiết trong ảnh và đưa ra nhận xét chuyên sâu.
+- Nếu chủ nhân gửi hình ảnh hoặc tập tin (văn bản/code/log), hãy phân tích kỹ các chi tiết nội dung được cung cấp và đưa ra nhận xét chuyên sâu phù hợp.
 - Nếu chủ nhân hỏi cần minh họa ảnh/sơ đồ hệ thống, bạn hãy đính kèm ảnh bằng cú pháp Markdown chuẩn: ![Mô tả ảnh](https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800) hoặc ảnh công nghệ phù hợp từ Unsplash.
 - Trả lời rõ ràng, sinh động, trình bày chuẩn Markdown (sử dụng tiêu đề ##, danh sách -, in đậm **text**, code block nếu cần). KHÔNG để lại các ký tự thô như *** trùng lặp không có ý nghĩa.
 - Trả lời bằng TIẾNG VIỆT hoàn toàn.
@@ -229,6 +253,8 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
         role: m.role,
         content: m.content,
         image: m.image,
+        file: m.file,
+        fileName: m.fileName,
       }));
 
       const controller = new AbortController();
@@ -462,6 +488,19 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
                     </div>
                   )}
 
+                  {/* User attached file rendering */}
+                  {msg.file && (
+                    <div className="mb-2.5 p-2 rounded-xl border border-white/10 bg-slate-950/80 flex items-center gap-2 max-w-sm">
+                      <FileCode size={18} className="text-cyan-400 shrink-0" />
+                      <div className="overflow-hidden">
+                        <p className="text-[11px] font-bold text-white truncate">{msg.fileName || "Tập tin đính kèm"}</p>
+                        <p className="text-[9px] text-slate-400 uppercase font-mono">
+                          {msg.file.split(";")[0]?.replace("data:", "") || "Document"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Formatted Content */}
                   {renderFormattedContent(msg.content)}
                 </div>
@@ -493,21 +532,6 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
         <div ref={chatEndRef} />
       </div>
 
-      {/* Quick Suggestion Pills */}
-      {messages.length < 5 && !isTyping && (
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 flex-shrink-0">
-          {suggestions.map((s, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleSendMessage(s)}
-              className="text-[10px] bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white px-2.5 py-1 rounded-full border border-white/10 whitespace-nowrap transition cursor-pointer shrink-0"
-            >
-              ✨ {s}
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Image Preview Thumbnail prior to sending */}
       {selectedImage && (
         <div className="mb-2 p-2 bg-slate-900/90 rounded-xl border border-white/15 flex items-center justify-between gap-2 shadow-xl animate-in fade-in slide-in-from-bottom-1">
@@ -527,29 +551,68 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
         </div>
       )}
 
-      {/* Hidden File Input */}
+      {/* File Preview Thumbnail prior to sending */}
+      {selectedFile && (
+        <div className="mb-2 p-2 bg-slate-900/90 rounded-xl border border-white/15 flex items-center justify-between gap-2 shadow-xl animate-in fade-in slide-in-from-bottom-1">
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="w-10 h-10 rounded-lg bg-cyan-500/10 border border-cyan-500/25 flex items-center justify-center shrink-0">
+              <FileCode size={20} className="text-cyan-400" />
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-xs font-bold text-white truncate">{selectedFileName}</p>
+              <p className="text-[9px] text-slate-400">Tập tin sẵn sàng đính kèm</p>
+            </div>
+          </div>
+          <button
+            onClick={() => { setSelectedFile(null); setSelectedFileName(null); }}
+            className="p-1 text-slate-400 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg transition cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
+      {/* Hidden File Inputs */}
       <input 
         type="file" 
         accept="image/*" 
-        ref={fileInputRef} 
+        ref={imageInputRef} 
         onChange={handleImageSelect} 
+        className="hidden" 
+      />
+      <input 
+        type="file" 
+        accept=".txt,.md,.json,.js,.ts,.tsx,.py,.html,.css,.log" 
+        ref={fileInputRef} 
+        onChange={handleFileSelect} 
         className="hidden" 
       />
 
       {/* Input area */}
       <div className="pt-2 border-t border-white/10 flex-shrink-0 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className={`p-2.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition cursor-pointer border border-white/10 flex items-center justify-center ${selectedImage ? "text-cyan-400 border-cyan-500/50 bg-cyan-500/10" : ""}`}
-          title="Đính kèm hình ảnh"
-        >
-          <ImageIcon size={16} />
-        </button>
+        <div className="flex gap-1">
+          <button
+            type="button"
+            onClick={() => imageInputRef.current?.click()}
+            className={`p-2.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition cursor-pointer border border-white/10 flex items-center justify-center ${selectedImage ? "text-cyan-400 border-cyan-500/50 bg-cyan-500/10" : ""}`}
+            title="Đính kèm hình ảnh"
+          >
+            <ImageIcon size={15} />
+          </button>
+          
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className={`p-2.5 bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white rounded-xl transition cursor-pointer border border-white/10 flex items-center justify-center ${selectedFile ? "text-cyan-400 border-cyan-500/50 bg-cyan-500/10" : ""}`}
+            title="Đính kèm file (.txt, .json, .py, .log...)"
+          >
+            <Paperclip size={15} />
+          </button>
+        </div>
 
         <input
           type="text"
-          placeholder={selectedImage ? "Nhập câu hỏi về hình ảnh này..." : "Hỏi trợ lý ảo hoặc chia sẻ sở thích cá nhân..."}
+          placeholder={selectedImage || selectedFile ? "Nhập tin nhắn..." : "Hỏi trợ lý ảo hoặc chia sẻ sở thích cá nhân..."}
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
@@ -559,7 +622,7 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
         
         <button
           onClick={() => handleSendMessage()}
-          disabled={(!inputValue.trim() && !selectedImage) || isTyping}
+          disabled={(!inputValue.trim() && !selectedImage && !selectedFile) || isTyping}
           className={`p-2.5 ${theme.bg} disabled:opacity-40 text-slate-950 rounded-xl transition cursor-pointer flex items-center justify-center shadow-lg hover:brightness-110`}
           id="send-chat-btn"
         >
