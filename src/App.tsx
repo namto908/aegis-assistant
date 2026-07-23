@@ -28,7 +28,7 @@ const DEFAULT_ASSISTANT: AssistantConfig = {
   prompt: "Bạn là Aegis, trợ lý ảo cá nhân đa năng rành công nghệ, tính cách lôi cuốn, tinh tế và luôn đặt bảo mật lên hàng đầu. Hãy trả lời ngắn gọn, thiết thực, có cấu trúc sử dụng Markdown nhẹ bằng Tiếng Việt.",
   avatarUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150",
   themeColor: "slate",
-  apiBaseUrl: "http://192.168.2.200:3000"
+  apiBaseUrl: "http://192.168.2.200:25530"
 };
 
 export default function App() {
@@ -113,7 +113,7 @@ export default function App() {
       if (storedAssistant) {
         const parsed = JSON.parse(storedAssistant);
         if (!parsed.apiBaseUrl) {
-          parsed.apiBaseUrl = "http://192.168.2.200:3000";
+          parsed.apiBaseUrl = "http://192.168.2.200:25530";
         }
         setAssistantConfig(parsed);
       } else {

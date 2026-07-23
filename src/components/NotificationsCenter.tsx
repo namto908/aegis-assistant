@@ -181,7 +181,7 @@ export default function NotificationsCenter({
   const triggerNewsPush = async (inputSignal?: AbortSignal) => {
     const signal = (inputSignal instanceof AbortSignal) ? inputSignal : undefined;
     setLoading(true);
-    const apiBase = (apiBaseUrl && apiBaseUrl.trim() !== "") ? apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:3000";
+    const apiBase = (apiBaseUrl && apiBaseUrl.trim() !== "") ? apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:25530";
     const targetUrl = `${apiBase}/api/gemini/news`;
 
     setLoadingLogs([

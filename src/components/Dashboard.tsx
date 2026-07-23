@@ -34,7 +34,7 @@ export default function Dashboard({ tasks, servers, notifications, assistantConf
     setIsLoadingBrief(true);
     setBriefError(null);
     try {
-      const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:3000";
+      const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:25530";
       const response = await fetch(`${apiBase}/api/gemini/briefing`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -86,7 +86,7 @@ export default function AssistantChat({
     return () => clearInterval(interval);
   }, [isTyping]);
 
-  const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:3000";
+  const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:25530";
 
   // Load chat history from DB on mount
   useEffect(() => {
