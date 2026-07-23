@@ -61,11 +61,11 @@ export default function AssistantChat({
   const [expandedThinking, setExpandedThinking] = useState<Record<number, boolean>>({});
   const [activeThinkingStep, setActiveThinkingStep] = useState(0);
   const thinkingSteps = [
-    "🔍 Đang phân tích tin nhắn và các tệp đính kèm...",
-    "📂 Đang nạp đặc điểm và phong cách từ USER.md...",
-    "⚙️ Đang đọc quy tắc và tech stack từ MEMORY.md...",
-    "📊 Đang tổng hợp trạng thái các Servers & Taskboard...",
-    "🤖 Đang gửi ngữ cảnh tới Gemini để lập luận phản hồi..."
+    "Đang phân tích tin nhắn và các tệp đính kèm...",
+    "Đang nạp đặc điểm và phong cách từ USER.md...",
+    "Đang đọc quy tắc và tech stack từ MEMORY.md...",
+    "Đang tổng hợp trạng thái các Servers & Taskboard...",
+    "Đang gửi ngữ cảnh tới Gemini để lập luận phản hồi..."
   ];
 
   const chatEndRef = useRef<HTMLDivElement>(null);
