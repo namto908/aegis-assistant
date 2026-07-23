@@ -197,7 +197,7 @@ export default function NotificationsCenter({
     }, 400);
 
     setTimeout(() => {
-      setLoadingLogs((prev) => [...prev, topic === "system-summary" ? "Thu thập dữ liệu trạng thái máy chủ & công việc Aegis..." : "Đang tìm kiếm tin tức mới nhất qua Google Search Grounding..."]);
+      setLoadingLogs((prev) => [...prev, topic === "system-summary" ? "Thu thập dữ liệu trạng thái máy chủ & công việc Aegis..." : "Đang tìm kiếm tin tức mới nhất qua Brave Search Engine..."]);
     }, 800);
 
     try {
