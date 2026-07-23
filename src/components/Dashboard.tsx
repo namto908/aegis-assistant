@@ -4,7 +4,7 @@ import {
   Sparkles, CheckSquare, Server, Bell, LayoutGrid, ListFilter, AlignLeft, 
   RefreshCw, TrendingUp, AlertTriangle, Play, HelpCircle, ArrowRight, User
 } from "lucide-react";
-import { Task, ServerStatus, Notification, AssistantConfig, HomeLayoutVariant, ScreenType } from "../types";
+import { Task, ServerStatus, Notification, AssistantConfig, HomeLayoutVariant, ScreenType, GoogleUser } from "../types";
 import { getThemeClasses } from "../lib/theme";
 
 interface DashboardProps {
@@ -13,9 +13,10 @@ interface DashboardProps {
   notifications: Notification[];
   assistantConfig: AssistantConfig;
   setScreen: (screen: ScreenType) => void;
+  user: GoogleUser | null;
 }
 
-export default function Dashboard({ tasks, servers, notifications, assistantConfig, setScreen }: DashboardProps) {
+export default function Dashboard({ tasks, servers, notifications, assistantConfig, setScreen, user }: DashboardProps) {
   const [layout, setLayout] = useState<HomeLayoutVariant>("bento");
   const theme = getThemeClasses(assistantConfig.themeColor || "slate");
   const [briefing, setBriefing] = useState<string>(
@@ -35,9 +36,13 @@ export default function Dashboard({ tasks, servers, notifications, assistantConf
     setBriefError(null);
     try {
       const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:25530";
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user) {
+        headers["Authorization"] = `Bearer ${user.idToken}`;
+      }
       const response = await fetch(`${apiBase}/api/gemini/briefing`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         signal,
         body: JSON.stringify({
           tasks,

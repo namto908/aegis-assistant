@@ -4,7 +4,7 @@ import {
   Send, Sparkles, AlertTriangle, User, Bot, Loader2, 
   Image as ImageIcon, X, Trash2, Brain, Cpu, Plus, Check, RefreshCw, FileCode, Paperclip, MessageSquarePlus, ChevronDown, ChevronUp
 } from "lucide-react";
-import { Message, AssistantConfig, Task, ServerStatus } from "../types";
+import { Message, AssistantConfig, Task, ServerStatus, GoogleUser } from "../types";
 import { getThemeClasses } from "../lib/theme";
 
 interface AssistantChatProps {
@@ -14,6 +14,7 @@ interface AssistantChatProps {
   addNotification: (title: string, description: string, category: "task" | "server" | "system") => void;
   prefillMessage?: string | null;
   clearPrefillMessage?: () => void;
+  user: GoogleUser | null;
 }
 
 interface UserMemory {
@@ -31,7 +32,8 @@ export default function AssistantChat({
   servers, 
   addNotification,
   prefillMessage,
-  clearPrefillMessage
+  clearPrefillMessage,
+  user
 }: AssistantChatProps) {
   const theme = getThemeClasses(assistantConfig.themeColor || "slate");
   const defaultWelcomeMsg: Message = {
@@ -92,7 +94,11 @@ export default function AssistantChat({
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const res = await fetch(`${apiBase}/api/gemini/history`);
+        const headers: Record<string, string> = {};
+        if (user) {
+          headers["Authorization"] = `Bearer ${user.idToken}`;
+        }
+        const res = await fetch(`${apiBase}/api/gemini/history`, { headers });
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -112,7 +118,7 @@ export default function AssistantChat({
       }
     };
     fetchHistory();
-  }, [apiBase]);
+  }, [apiBase, user]);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -133,7 +139,11 @@ export default function AssistantChat({
   const fetchMemories = async () => {
     setLoadingMemories(true);
     try {
-      const res = await fetch(`${apiBase}/api/gemini/memories`);
+      const headers: Record<string, string> = {};
+      if (user) {
+        headers["Authorization"] = `Bearer ${user.idToken}`;
+      }
+      const res = await fetch(`${apiBase}/api/gemini/memories`, { headers });
       if (res.ok) {
         const data = await res.json();
         setMemories(data);
@@ -153,9 +163,13 @@ export default function AssistantChat({
   const handleAddMemory = async () => {
     if (!newMemKey.trim() || !newMemVal.trim()) return;
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user) {
+        headers["Authorization"] = `Bearer ${user.idToken}`;
+      }
       const res = await fetch(`${apiBase}/api/gemini/memories`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         body: JSON.stringify({ key: newMemKey.trim(), value: newMemVal.trim(), category: "preference" })
       });
       if (res.ok) {
@@ -170,7 +184,11 @@ export default function AssistantChat({
 
   const handleDeleteMemory = async (id: string) => {
     try {
-      const res = await fetch(`${apiBase}/api/gemini/memories/${id}`, { method: "DELETE" });
+      const headers: Record<string, string> = {};
+      if (user) {
+        headers["Authorization"] = `Bearer ${user.idToken}`;
+      }
+      const res = await fetch(`${apiBase}/api/gemini/memories/${id}`, { method: "DELETE", headers });
       if (res.ok) {
         setMemories((prev) => prev.filter((m) => m.id !== id));
       }
@@ -182,7 +200,11 @@ export default function AssistantChat({
   const handleClearHistory = async () => {
     setMessages([defaultWelcomeMsg]);
     try {
-      await fetch(`${apiBase}/api/gemini/history`, { method: "DELETE" });
+      const headers: Record<string, string> = {};
+      if (user) {
+        headers["Authorization"] = `Bearer ${user.idToken}`;
+      }
+      await fetch(`${apiBase}/api/gemini/history`, { method: "DELETE", headers });
     } catch (e) {
       console.error("Failed to clear history on backend", e);
     }
@@ -283,9 +305,13 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
       }));
 
       const controller = new AbortController();
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user) {
+        headers["Authorization"] = `Bearer ${user.idToken}`;
+      }
       const response = await fetch(`${apiBase}/api/gemini/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         signal: controller.signal,
         body: JSON.stringify({
           messages: chatHistoryForGemini,

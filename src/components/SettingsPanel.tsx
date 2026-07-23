@@ -4,10 +4,11 @@ import {
   User, Settings, Sparkles, Image, RefreshCw, Shield, 
   Mail, Key, Terminal, Code, Heart, Trash2, Palette, Upload 
 } from "lucide-react";
-import { AssistantConfig, ThemeColor } from "../types";
+import { AssistantConfig, ThemeColor, GoogleUser } from "../types";
 import { getThemeClasses } from "../lib/theme";
 import { Capacitor } from "@capacitor/core";
 import { Camera, CameraResultType, CameraSource } from "@capacitor/camera";
+import { LogOut } from "lucide-react"; // Import LogOut icon
 
 interface SettingsPanelProps {
   assistantConfig: AssistantConfig;
@@ -15,6 +16,8 @@ interface SettingsPanelProps {
   resetMockData: () => void;
   userEmail?: string;
   addNotification: (title: string, description: string, category: "task" | "server" | "system") => void;
+  user: GoogleUser | null;
+  onLogout?: () => void;
 }
 
 const THEME_COLORS: { id: ThemeColor; name: string; bgClass: string }[] = [
@@ -31,8 +34,9 @@ export default function SettingsPanel({
   assistantConfig, 
   setAssistantConfig, 
   resetMockData, 
-  userEmail = "NamTo908@gmail.com",
-  addNotification
+  addNotification,
+  user,
+  onLogout
 }: SettingsPanelProps) {
   const [name, setName] = useState(assistantConfig.name);
   const [prompt, setPrompt] = useState(assistantConfig.prompt);
@@ -119,22 +123,38 @@ export default function SettingsPanel({
       </div>
 
       {/* User Info card */}
-      <div className="glass-card rounded-2xl p-4 flex items-center gap-3 relative overflow-hidden">
+      <div className="glass-card rounded-2xl p-4 flex items-center justify-between relative overflow-hidden">
         {/* Subtle decorative glow of chosen theme color */}
         <div className={`absolute top-0 right-0 w-20 h-20 ${theme.glow} rounded-full blur-xl pointer-events-none`}></div>
 
-        <div className={`w-12 h-12 rounded-full bg-white/5 border ${theme.borderMuted} flex items-center justify-center ${theme.text}`}>
-          <User size={24} />
+        <div className="flex items-center gap-3">
+          <div className={`w-12 h-12 rounded-full overflow-hidden border ${theme.borderMuted} flex items-center justify-center bg-white/5`}>
+            {user?.picture ? (
+              <img src={user.picture} alt={user.name} className="w-full h-full object-cover" />
+            ) : (
+              <User size={24} className={theme.text} />
+            )}
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-white font-display">{user?.name || "Chủ nhân"}</h3>
+            <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 font-mono">
+              <Mail size={12} className="text-slate-500" /> {user?.email || "unknown@aegis.com"}
+            </p>
+            <span className={`inline-block mt-1 text-[8px] tracking-widest font-mono uppercase bg-white/5 ${theme.text} border ${theme.borderMuted} px-1.5 py-0.5 rounded`}>
+              {user?.idToken.startsWith("mock_") ? "Developer Mode" : "Google Account"}
+            </span>
+          </div>
         </div>
-        <div>
-          <h3 className="text-sm font-bold text-white font-display">Chủ sở hữu hệ thống</h3>
-          <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
-            <Mail size={12} className="text-slate-500" /> {userEmail}
-          </p>
-          <span className={`inline-block mt-1 text-[8px] tracking-widest font-mono uppercase bg-white/5 ${theme.text} border ${theme.borderMuted} px-1.5 py-0.5 rounded`}>
-            Developer / Admin
-          </span>
-        </div>
+
+        {onLogout && (
+          <button 
+            onClick={onLogout}
+            className="p-2.5 rounded-xl bg-white/5 hover:bg-red-500/10 border border-white/10 hover:border-red-500/25 text-slate-400 hover:text-red-400 active:scale-95 transition cursor-pointer z-10 flex items-center justify-center"
+            title="Đăng xuất"
+          >
+            <LogOut size={16} />
+          </button>
+        )}
       </div>
 
       {/* Primary Color Selector Section */}

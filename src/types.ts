@@ -54,3 +54,11 @@ export interface Message {
   fileName?: string;
   thinking?: string;
 }
+
+export interface GoogleUser {
+  id: string;
+  email: string;
+  name: string;
+  picture?: string;
+  idToken: string;
+}

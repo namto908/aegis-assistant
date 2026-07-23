@@ -7,7 +7,7 @@ import {
   Terminal, Sparkles, Inbox, Newspaper, Clock, 
   ExternalLink, X, ChevronRight, Calendar, RefreshCw 
 } from "lucide-react";
-import type { Notification, ThemeColor, Task, ServerStatus } from "../types";
+import type { Notification, ThemeColor, Task, ServerStatus, GoogleUser } from "../types";
 import { getThemeClasses } from "../lib/theme";
 
 interface NotificationsCenterProps {
@@ -19,6 +19,7 @@ interface NotificationsCenterProps {
   setScreen?: React.Dispatch<React.SetStateAction<any>>;
   onDiscussWithChatbot?: (message: string) => void;
   apiBaseUrl?: string;
+  user: GoogleUser | null;
 }
 
 export default function NotificationsCenter({ 
@@ -29,7 +30,8 @@ export default function NotificationsCenter({
   servers = [],
   setScreen,
   onDiscussWithChatbot,
-  apiBaseUrl
+  apiBaseUrl,
+  user
 }: NotificationsCenterProps) {
   const [filter, setFilter] = useState<"all" | "unread">("all");
   
@@ -198,9 +200,13 @@ export default function NotificationsCenter({
     }, 800);
 
     try {
+      const headers: Record<string, string> = { "Content-Type": "application/json" };
+      if (user) {
+        headers["Authorization"] = `Bearer ${user.idToken}`;
+      }
       const response = await fetch(targetUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers,
         signal,
         body: JSON.stringify({
           topic,

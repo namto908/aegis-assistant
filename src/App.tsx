@@ -5,9 +5,10 @@ import { App as CapApp } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { 
   Home, CheckSquare, Bell, Server, MessageSquare, Settings, 
-  Wifi, Battery, Shield, Sparkles, Clock, Smartphone, Info 
+  Wifi, Battery, Shield, Sparkles, Clock, Smartphone, Info,
+  LogIn, LogOut, User, Key
 } from "lucide-react";
-import { Task, ServerStatus, Notification, AssistantConfig, ScreenType } from "./types";
+import { Task, ServerStatus, Notification, AssistantConfig, ScreenType, GoogleUser } from "./types";
 import { getThemeClasses } from "./lib/theme";
 import Dashboard from "./components/Dashboard";
 import TasksList from "./components/TasksList";
@@ -32,6 +33,10 @@ const DEFAULT_ASSISTANT: AssistantConfig = {
 };
 
 export default function App() {
+  const [user, setUser] = useState<GoogleUser | null>(null);
+  const [mockName, setMockName] = useState("Nam");
+  const [mockEmail, setMockEmail] = useState("dev1@aegis.com");
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [servers, setServers] = useState<ServerStatus[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -44,6 +49,11 @@ export default function App() {
   const [chatPrefill, setChatPrefill] = useState<string | null>(null);
 
   const lastNavTimeRef = useRef<number>(0);
+  const prevTasksRef = useRef<Task[]>([]);
+  const prevServersRef = useRef<ServerStatus[]>([]);
+  const prevNotificationsRef = useRef<Notification[]>([]);
+
+  const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:25530";
 
   const changeScreen = (newScreen: ScreenType) => {
     const now = Date.now();
@@ -53,6 +63,78 @@ export default function App() {
     if (newScreen === screen) return;
     setScreen(newScreen);
     setScreenHistory((prev) => [...prev, newScreen]);
+  };
+
+  const fetchUserData = async (usr: GoogleUser) => {
+    try {
+      const headers = {
+        "Authorization": `Bearer ${usr.idToken}`
+      };
+      
+      const configRes = await fetch(`${apiBase}/api/config`, { headers });
+      if (configRes.ok) {
+        const configData = await configRes.json();
+        setAssistantConfig(configData);
+      }
+      
+      const tasksRes = await fetch(`${apiBase}/api/tasks`, { headers });
+      if (tasksRes.ok) {
+        const tasksData = await tasksRes.json();
+        prevTasksRef.current = tasksData;
+        setTasks(tasksData);
+      }
+      
+      const serversRes = await fetch(`${apiBase}/api/servers`, { headers });
+      if (serversRes.ok) {
+        const serversData = await serversRes.json();
+        prevServersRef.current = serversData;
+        setServers(serversData);
+      }
+      
+      const notifsRes = await fetch(`${apiBase}/api/notifications`, { headers });
+      if (notifsRes.ok) {
+        const notifsData = await notifsRes.json();
+        prevNotificationsRef.current = notifsData;
+        setNotifications(notifsData);
+      }
+    } catch (e) {
+      console.error("Error fetching user data from backend:", e);
+    }
+  };
+
+  const handleGoogleLogin = async () => {
+    alert("Tính năng Đăng nhập Google thật yêu cầu cấu hình Client ID và Keystore SHA-1 trên thiết bị di động.\n\nHãy sử dụng 'Đăng nhập thử nghiệm (Dev Mode)' bên dưới để test phân tách bộ nhớ ngay lập tức!");
+  };
+
+  const handleMockLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mockName.trim() || !mockEmail.trim()) {
+      alert("Vui lòng điền tên và email.");
+      return;
+    }
+    const mockUser: GoogleUser = {
+      id: `google_mock_${mockEmail.replace("@", "_").replace(".", "_")}`,
+      email: mockEmail.trim(),
+      name: mockName.trim(),
+      picture: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150",
+      idToken: `mock_user_token_dev_${mockName.trim().replace(/\s+/g, "")}_${mockEmail.trim()}`
+    };
+    localStorage.setItem("aegis_user", JSON.stringify(mockUser));
+    setUser(mockUser);
+    fetchUserData(mockUser);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("aegis_user");
+    localStorage.removeItem("aegis_tasks");
+    localStorage.removeItem("aegis_servers");
+    localStorage.removeItem("aegis_notifications");
+    setUser(null);
+    setTasks([]);
+    setServers([]);
+    setNotifications([]);
+    setAssistantConfig(DEFAULT_ASSISTANT);
+    setScreen("home");
   };
 
   // Handle Native Android Hardware Back Button / Back Gesture & Edge-to-Edge Status Bar
@@ -93,57 +175,195 @@ export default function App() {
     };
   }, [screen, screenHistory]);
 
-  // Load and Save Local Storage State
+  // Load User on mount
   useEffect(() => {
     try {
-      const storedTasks = localStorage.getItem("aegis_tasks");
-      const storedServers = localStorage.getItem("aegis_servers");
-      const storedNotifications = localStorage.getItem("aegis_notifications");
-      const storedAssistant = localStorage.getItem("aegis_assistant");
-
-      if (storedTasks) setTasks(JSON.parse(storedTasks));
-      else setTasks(DEFAULT_TASKS);
-
-      if (storedServers) setServers(JSON.parse(storedServers));
-      else setServers(DEFAULT_SERVERS);
-
-      if (storedNotifications) setNotifications(JSON.parse(storedNotifications));
-      else setNotifications(DEFAULT_NOTIFICATIONS);
-
-      if (storedAssistant) {
-        const parsed = JSON.parse(storedAssistant);
-        if (!parsed.apiBaseUrl) {
-          parsed.apiBaseUrl = "http://192.168.2.200:25530";
-        }
-        setAssistantConfig(parsed);
+      const storedUser = localStorage.getItem("aegis_user");
+      if (storedUser) {
+        const parsedUser = JSON.parse(storedUser);
+        setUser(parsedUser);
+        fetchUserData(parsedUser);
       } else {
-        setAssistantConfig(DEFAULT_ASSISTANT);
+        const storedTasks = localStorage.getItem("aegis_tasks");
+        const storedServers = localStorage.getItem("aegis_servers");
+        const storedNotifications = localStorage.getItem("aegis_notifications");
+        const storedAssistant = localStorage.getItem("aegis_assistant");
+
+        if (storedTasks) setTasks(JSON.parse(storedTasks));
+        else setTasks(DEFAULT_TASKS);
+
+        if (storedServers) setServers(JSON.parse(storedServers));
+        else setServers(DEFAULT_SERVERS);
+
+        if (storedNotifications) setNotifications(JSON.parse(storedNotifications));
+        else setNotifications(DEFAULT_NOTIFICATIONS);
+
+        if (storedAssistant) {
+          const parsed = JSON.parse(storedAssistant);
+          if (!parsed.apiBaseUrl) {
+            parsed.apiBaseUrl = "http://192.168.2.200:25530";
+          }
+          setAssistantConfig(parsed);
+        } else {
+          setAssistantConfig(DEFAULT_ASSISTANT);
+        }
       }
     } catch (e) {
       console.error("Local Storage Load Error:", e);
-      setTasks(DEFAULT_TASKS);
-      setServers(DEFAULT_SERVERS);
-      setNotifications(DEFAULT_NOTIFICATIONS);
-      setAssistantConfig(DEFAULT_ASSISTANT);
     }
   }, []);
 
-  // Save states to local storage on changes
+  // Declarative Backend Sync Effects
   useEffect(() => {
-    if (tasks.length > 0) localStorage.setItem("aegis_tasks", JSON.stringify(tasks));
-  }, [tasks]);
+    if (!user) return;
+    const prev = prevTasksRef.current;
+    if (prev.length === 0 && tasks.length === 0) {
+      prevTasksRef.current = tasks;
+      return;
+    }
+    
+    const sync = async () => {
+      const deleted = prev.filter(p => !tasks.some(t => t.id === p.id));
+      for (const d of deleted) {
+        await fetch(`${apiBase}/api/tasks/${d.id}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${user.idToken}` }
+        }).catch(err => console.error(err));
+      }
+      
+      const addedOrUpdated = tasks.filter(t => {
+        const p = prev.find(prevTask => prevTask.id === t.id);
+        return !p || JSON.stringify(p) !== JSON.stringify(t);
+      });
+      for (const t of addedOrUpdated) {
+        const p = prev.find(prevTask => prevTask.id === t.id);
+        const method = p ? "PUT" : "POST";
+        const url = p ? `${apiBase}/api/tasks/${t.id}` : `${apiBase}/api/tasks`;
+        await fetch(url, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${user.idToken}`
+          },
+          body: JSON.stringify(t)
+        }).catch(err => console.error(err));
+      }
+      prevTasksRef.current = tasks;
+      localStorage.setItem("aegis_tasks", JSON.stringify(tasks));
+    };
+    
+    sync();
+  }, [tasks, user, apiBase]);
 
   useEffect(() => {
-    if (servers.length > 0) localStorage.setItem("aegis_servers", JSON.stringify(servers));
-  }, [servers]);
+    if (!user) return;
+    const prev = prevServersRef.current;
+    if (prev.length === 0 && servers.length === 0) {
+      prevServersRef.current = servers;
+      return;
+    }
+    
+    const sync = async () => {
+      const deleted = prev.filter(p => !servers.some(s => s.id === p.id));
+      for (const d of deleted) {
+        await fetch(`${apiBase}/api/servers/${d.id}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${user.idToken}` }
+        }).catch(err => console.error(err));
+      }
+      
+      const addedOrUpdated = servers.filter(s => {
+        const p = prev.find(prevSrv => prevSrv.id === s.id);
+        return !p || JSON.stringify(p) !== JSON.stringify(s);
+      });
+      for (const s of addedOrUpdated) {
+        const p = prev.find(prevSrv => prevSrv.id === s.id);
+        const method = p ? "PUT" : "POST";
+        const url = p ? `${apiBase}/api/servers/${s.id}` : `${apiBase}/api/servers`;
+        await fetch(url, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${user.idToken}`
+          },
+          body: JSON.stringify(s)
+        }).catch(err => console.error(err));
+      }
+      prevServersRef.current = servers;
+      localStorage.setItem("aegis_servers", JSON.stringify(servers));
+    };
+    
+    sync();
+  }, [servers, user, apiBase]);
 
   useEffect(() => {
-    if (notifications.length > 0) localStorage.setItem("aegis_notifications", JSON.stringify(notifications));
-  }, [notifications]);
+    if (!user) return;
+    const prev = prevNotificationsRef.current;
+    if (prev.length === 0 && notifications.length === 0) {
+      prevNotificationsRef.current = notifications;
+      return;
+    }
+    
+    const sync = async () => {
+      const deleted = prev.filter(p => !notifications.some(n => n.id === p.id));
+      for (const d of deleted) {
+        await fetch(`${apiBase}/api/notifications/${d.id}`, {
+          method: "DELETE",
+          headers: { "Authorization": `Bearer ${user.idToken}` }
+        }).catch(err => console.error(err));
+      }
+      
+      const addedOrUpdated = notifications.filter(n => {
+        const p = prev.find(prevNotif => prevNotif.id === n.id);
+        return !p || JSON.stringify(p) !== JSON.stringify(n);
+      });
+      for (const n of addedOrUpdated) {
+        const p = prev.find(prevNotif => prevNotif.id === n.id);
+        if (p) {
+          if (n.read && !p.read) {
+            await fetch(`${apiBase}/api/notifications/${n.id}/read`, {
+              method: "PUT",
+              headers: { "Authorization": `Bearer ${user.idToken}` }
+            }).catch(err => console.error(err));
+          }
+        } else {
+          await fetch(`${apiBase}/api/notifications`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${user.idToken}`
+            },
+            body: JSON.stringify(n)
+          }).catch(err => console.error(err));
+        }
+      }
+      prevNotificationsRef.current = notifications;
+      localStorage.setItem("aegis_notifications", JSON.stringify(notifications));
+    };
+    
+    sync();
+  }, [notifications, user, apiBase]);
 
   useEffect(() => {
-    localStorage.setItem("aegis_assistant", JSON.stringify(assistantConfig));
-  }, [assistantConfig]);
+    if (!user) return;
+    const syncConfig = async () => {
+      try {
+        await fetch(`${apiBase}/api/config`, {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${user.idToken}`
+          },
+          body: JSON.stringify(assistantConfig)
+        });
+      } catch (e) {
+        console.error("Failed to sync assistant config to backend:", e);
+      }
+    };
+    
+    const timer = setTimeout(syncConfig, 1000);
+    return () => clearTimeout(timer);
+  }, [assistantConfig, user, apiBase]);
 
   // Update real-time smartphone clock
   useEffect(() => {
@@ -184,6 +404,78 @@ export default function App() {
   const theme = getThemeClasses(assistantConfig.themeColor || "slate");
 
   // Render proper screen content
+  const renderLoginScreen = () => {
+    return (
+      <div className="w-full max-w-sm p-6 rounded-[32px] border border-white/10 bg-slate-900/60 backdrop-blur-2xl shadow-2xl flex flex-col items-center justify-center space-y-6 text-center animate-in fade-in zoom-in duration-350 z-50">
+        <div className="relative">
+          <div className="w-16 h-16 rounded-full bg-cyan-500/10 flex items-center justify-center border border-cyan-500/20 shadow-[0_0_20px_rgba(6,182,212,0.15)] animate-pulse">
+            <Shield className="text-cyan-400 fill-cyan-400/10" size={28} />
+          </div>
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-cyan-400 rounded-full flex items-center justify-center animate-bounce">
+            <Sparkles size={8} className="text-slate-950" />
+          </div>
+        </div>
+
+        <div>
+          <h2 className="text-xl font-bold text-white tracking-tight">AEGIS ASSISTANT</h2>
+          <p className="text-xs text-slate-400 mt-1">Hệ thống Trợ lý ảo & Bảo mật Cá nhân</p>
+        </div>
+
+        <form onSubmit={handleMockLogin} className="w-full space-y-3.5 pt-2">
+          <div className="space-y-1.5 text-left">
+            <label className="text-[10px] uppercase font-bold text-slate-400 px-1">Tên người dùng</label>
+            <input 
+              type="text" 
+              value={mockName}
+              onChange={(e) => setMockName(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 transition"
+              placeholder="Ví dụ: Nam, Minh..."
+              required
+            />
+          </div>
+          <div className="space-y-1.5 text-left">
+            <label className="text-[10px] uppercase font-bold text-slate-400 px-1">Email tài khoản</label>
+            <input 
+              type="email" 
+              value={mockEmail}
+              onChange={(e) => setMockEmail(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl bg-slate-950/80 border border-white/10 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 transition font-mono"
+              placeholder="user@example.com"
+              required
+            />
+          </div>
+
+          <button 
+            type="submit" 
+            className="w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/10 active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            <LogIn size={13} />
+            Đăng nhập Thử nghiệm (Dev Mode)
+          </button>
+        </form>
+
+        <div className="w-full flex items-center justify-between text-[10px] text-slate-500 font-medium px-2">
+          <div className="h-[1px] bg-white/5 flex-1"></div>
+          <span className="px-3 uppercase tracking-wider">hoặc</span>
+          <div className="h-[1px] bg-white/5 flex-1"></div>
+        </div>
+
+        <button 
+          onClick={handleGoogleLogin}
+          className="w-full py-2.5 rounded-xl border border-white/10 hover:border-white/20 bg-white/5 hover:bg-white/10 text-white font-medium text-xs active:scale-[0.98] transition cursor-pointer flex items-center justify-center gap-2"
+        >
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#EA4335" d="M12 5.04c1.78 0 3.38.61 4.64 1.8l3.46-3.46C17.99 1.19 15.15 0 12 0 7.31 0 3.25 2.69 1.18 6.63l4.03 3.12C6.18 7.02 8.85 5.04 12 5.04z" />
+            <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.28 1.48-1.12 2.74-2.38 3.58l3.69 2.87c2.16-1.99 3.42-4.92 3.42-8.6z" />
+            <path fill="#FBBC05" d="M5.21 14.77c-.24-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27L1.18 7.11C.43 8.58 0 10.24 0 12s.43 3.42 1.18 4.89l4.03-3.12z" />
+            <path fill="#34A853" d="M12 24c3.24 0 5.97-1.07 7.96-2.91l-3.69-2.87c-1.02.68-2.33 1.09-3.96 1.09-3.15 0-5.82-1.98-6.78-4.71L1.49 17.72C3.56 21.31 7.31 24 12 24z" />
+          </svg>
+          Đăng nhập với Google
+        </button>
+      </div>
+    );
+  };
+
   const renderScreenContent = () => {
     switch (screen) {
       case "home":
@@ -194,6 +486,7 @@ export default function App() {
             notifications={notifications} 
             assistantConfig={assistantConfig}
             setScreen={setScreen}
+            user={user}
           />
         );
       case "tasks":
@@ -219,6 +512,7 @@ export default function App() {
               setScreen("chat");
             }}
             apiBaseUrl={assistantConfig.apiBaseUrl}
+            user={user}
           />
         );
       case "server":
@@ -239,6 +533,7 @@ export default function App() {
             addNotification={addNotification}
             prefillMessage={chatPrefill}
             clearPrefillMessage={() => setChatPrefill(null)}
+            user={user}
           />
         );
       case "settings":
@@ -248,6 +543,8 @@ export default function App() {
             setAssistantConfig={setAssistantConfig} 
             resetMockData={resetMockData}
             addNotification={addNotification}
+            user={user}
+            onLogout={handleLogout}
           />
         );
     }
@@ -256,12 +553,21 @@ export default function App() {
   const isNative = Capacitor.isNativePlatform();
 
   if (isNative) {
+    if (!user) {
+      return (
+        <div className="relative h-screen w-screen max-h-screen overflow-hidden flex flex-col bg-slate-950 font-sans select-none text-slate-100 items-center justify-center p-4">
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] rounded-full bg-cyan-500/10 opacity-30 pointer-events-none transform-gpu"></div>
+          {renderLoginScreen()}
+        </div>
+      );
+    }
+
     return (
       <div className="relative h-screen w-screen max-h-screen overflow-hidden flex flex-col bg-slate-950 font-sans select-none text-slate-100">
         
         {/* Ambient background glow matching theme */}
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] rounded-full bg-cyan-500/10 opacity-30 pointer-events-none transform-gpu"></div>
-
+        
         {/* Active Screen Area with safe padding top (pt-11 / 44px) for Mi 15 teardrop/punch-hole notch */}
         <div className="flex-1 overflow-y-auto px-4 pt-11 pb-2 no-scrollbar z-30 flex flex-col min-h-0">
           <AnimatePresence mode="wait">
@@ -376,132 +682,148 @@ export default function App() {
       {/* Reduced visual distraction: single highly muted ambient glow that aligns with the selected theme color */}
       <div className={`absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full ${theme.glow} opacity-35 blur-[120px] pointer-events-none`}></div>
 
-      {/* Decorative Branding Frame Title for Web View */}
-      <div className="text-center mb-4 z-10 select-none">
-        <h1 className="text-2xl font-extrabold tracking-tight font-display text-white flex items-center justify-center gap-2">
-          <Shield className={`${theme.text} fill-white/5`} size={24} /> Aegis OS
-        </h1>
-        <p className="text-xs text-slate-400 max-w-xs mt-1">
-          Trợ Lý Ảo Đa Năng Quản Trị Hệ Thống Cá Nhân • Glassmorphic Android Engine
-        </p>
-      </div>
-
-      {/* Android Mobile Phone Enclosure Mockup */}
-      <div className="relative w-full max-w-sm h-[740px] rounded-[40px] border-4 border-white/15 bg-slate-950/45 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden z-10">
-        
-        {/* Dynamic Glass Highlight reflection */}
-        <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.02] to-transparent pointer-events-none"></div>
-
-        {/* Top Camera Notch & Speaker Grill */}
-        <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-slate-950 rounded-b-2xl border-x border-b border-white/5 flex items-center justify-center gap-1.5 z-50">
-          <div className={`w-1.5 h-1.5 rounded-full ${theme.bg} opacity-80 animate-pulse`}></div>
-          <div className="w-12 h-1 bg-white/10 rounded-full"></div>
-        </div>
-
-        {/* Phone Top Status Bar */}
-        <div className="h-10 px-6 pt-2 flex items-end justify-between text-xs text-slate-300 font-medium select-none z-40">
-          <div className="flex items-center gap-1">
-            <Clock size={12} className={`${theme.text} opacity-80`} />
-            <span className="font-mono text-[11px]">{phoneTime || "08:30"}</span>
+      {!user ? (
+        <>
+          <div className="text-center mb-4 z-10 select-none">
+            <h1 className="text-2xl font-extrabold tracking-tight font-display text-white flex items-center justify-center gap-2">
+              <Shield className={`${theme.text} fill-white/5`} size={24} /> Aegis OS
+            </h1>
+            <p className="text-xs text-slate-400 max-w-xs mt-1">
+              Trợ Lý Ảo Đa Năng Quản Trị Hệ Thống Cá Nhân • Glassmorphic Android Engine
+            </p>
           </div>
-          
-          <div className="flex items-center gap-1.5">
-            <Wifi size={13} className="text-slate-300" />
-            <span className={`text-[10px] font-mono font-semibold ${theme.text}`}>5G</span>
-            <Battery size={14} className="text-emerald-400" />
+          {renderLoginScreen()}
+        </>
+      ) : (
+        <>
+          {/* Decorative Branding Frame Title for Web View */}
+          <div className="text-center mb-4 z-10 select-none">
+            <h1 className="text-2xl font-extrabold tracking-tight font-display text-white flex items-center justify-center gap-2">
+              <Shield className={`${theme.text} fill-white/5`} size={24} /> Aegis OS
+            </h1>
+            <p className="text-xs text-slate-400 max-w-xs mt-1">
+              Trợ Lý Ảo Đa Năng Quản Trị Hệ Thống Cá Nhân • Glassmorphic Android Engine
+            </p>
           </div>
-        </div>
 
-        {/* Active Screen Area with Custom Smooth Animation Transitions */}
-        <div className="flex-1 overflow-y-auto px-5 pt-3 no-scrollbar z-30">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={screen}
-              initial={{ opacity: 0, y: 4 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.1 }}
-              className="h-full transform-gpu"
-            >
-              {renderScreenContent()}
-            </motion.div>
-          </AnimatePresence>
-        </div>
+          {/* Android Mobile Phone Enclosure Mockup */}
+          <div className="relative w-full max-w-sm h-[740px] rounded-[40px] border-4 border-white/15 bg-slate-950/45 backdrop-blur-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden z-10">
+            
+            {/* Dynamic Glass Highlight reflection */}
+            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.02] to-transparent pointer-events-none"></div>
 
-        {/* Phone Bottom Navigation Bar with Glassmorphism */}
-        <div className="h-16 px-4 pb-2 glass-panel border-t border-white/10 flex items-center justify-around z-40 select-none">
-          {/* Home Tab */}
-          <button 
-            onClick={() => setScreen("home")}
-            className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer ${screen === "home" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
-            id="nav-home-tab"
-            title="Tổng hợp"
-          >
-            <Home size={18} />
-            <span className="text-[9px] mt-0.5 font-medium">Home</span>
-          </button>
+            {/* Top Camera Notch & Speaker Grill */}
+            <div className="absolute top-0 left-1/2 transform -translate-x-1/2 w-32 h-6 bg-slate-950 rounded-b-2xl border-x border-b border-white/5 flex items-center justify-center gap-1.5 z-50">
+              <div className={`w-1.5 h-1.5 rounded-full ${theme.bg} opacity-80 animate-pulse`}></div>
+              <div className="w-12 h-1 bg-white/10 rounded-full"></div>
+            </div>
 
-          {/* Tasks Tab */}
-          <button 
-            onClick={() => setScreen("tasks")}
-            className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer ${screen === "tasks" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
-            id="nav-tasks-tab"
-            title="Công việc"
-          >
-            <CheckSquare size={18} />
-            <span className="text-[9px] mt-0.5 font-medium">Tasks</span>
-          </button>
+            {/* Phone Top Status Bar */}
+            <div className="h-10 px-6 pt-2 flex items-end justify-between text-xs text-slate-300 font-medium select-none z-40">
+              <div className="flex items-center gap-1">
+                <Clock size={12} className={`${theme.text} opacity-80`} />
+                <span className="font-mono text-[11px]">{phoneTime || "08:30"}</span>
+              </div>
+              
+              <div className="flex items-center gap-1.5">
+                <Wifi size={13} className="text-slate-300" />
+                <span className={`text-[10px] font-mono font-semibold ${theme.text}`}>5G</span>
+                <Battery size={14} className="text-emerald-400" />
+              </div>
+            </div>
 
-          {/* Server Tab */}
-          <button 
-            onClick={() => setScreen("server")}
-            className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer ${screen === "server" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
-            id="nav-server-tab"
-            title="Giám sát máy chủ"
-          >
-            <Server size={18} />
-            <span className="text-[9px] mt-0.5 font-medium">Uptime</span>
-          </button>
+            {/* Active Screen Area with Custom Smooth Animation Transitions */}
+            <div className="flex-1 overflow-y-auto px-5 pt-3 no-scrollbar z-30 flex flex-col min-h-0">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={screen}
+                  initial={{ opacity: 0, y: 4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.1 }}
+                  className="h-full flex flex-col flex-1 min-h-0 transform-gpu"
+                >
+                  {renderScreenContent()}
+                </motion.div>
+              </AnimatePresence>
+            </div>
 
-          {/* Assistant Chat Tab */}
-          <button 
-            onClick={() => setScreen("chat")}
-            className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer ${screen === "chat" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
-            id="nav-chat-tab"
-            title="Trò chuyện AI"
-          >
-            <MessageSquare size={18} className={screen === "chat" ? "" : "animate-pulse"} />
-            <span className="text-[9px] mt-0.5 font-medium">Trợ lý</span>
-          </button>
+            {/* Phone Bottom Navigation Bar with Glassmorphism */}
+            <div className="h-16 px-4 pb-2 glass-panel border-t border-white/10 flex items-center justify-around z-40 select-none">
+              {/* Home Tab */}
+              <button 
+                onClick={() => setScreen("home")}
+                className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer ${screen === "home" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
+                id="nav-home-tab"
+                title="Tổng hợp"
+              >
+                <Home size={18} />
+                <span className="text-[9px] mt-0.5 font-medium">Home</span>
+              </button>
 
-          {/* Notifications Tab */}
-          <button 
-            onClick={() => setScreen("notifications")}
-            className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer relative ${screen === "notifications" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
-            id="nav-notif-tab"
-            title="Thông báo"
-          >
-            <Bell size={18} />
-            {unreadCount > 0 && (
-              <span className="absolute top-1.5 right-2 w-4 h-4 bg-red-500 border border-slate-900 text-[8px] font-bold text-white flex items-center justify-center rounded-full">
-                {unreadCount}
-              </span>
-            )}
-            <span className="text-[9px] mt-0.5 font-medium">Tin báo</span>
-          </button>
+              {/* Tasks Tab */}
+              <button 
+                onClick={() => setScreen("tasks")}
+                className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer ${screen === "tasks" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
+                id="nav-tasks-tab"
+                title="Công việc"
+              >
+                <CheckSquare size={18} />
+                <span className="text-[9px] mt-0.5 font-medium">Tasks</span>
+              </button>
 
-          {/* Settings Tab */}
-          <button 
-            onClick={() => setScreen("settings")}
-            className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer ${screen === "settings" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
-            id="nav-settings-tab"
-            title="Cấu hình"
-          >
-            <Settings size={18} />
-            <span className="text-[9px] mt-0.5 font-medium">Cài đặt</span>
-          </button>
-        </div>
-      </div>
+              {/* Server Tab */}
+              <button 
+                onClick={() => setScreen("server")}
+                className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer ${screen === "server" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
+                id="nav-server-tab"
+                title="Giám sát máy chủ"
+              >
+                <Server size={18} />
+                <span className="text-[9px] mt-0.5 font-medium">Uptime</span>
+              </button>
+
+              {/* Assistant Chat Tab */}
+              <button 
+                onClick={() => setScreen("chat")}
+                className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer ${screen === "chat" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
+                id="nav-chat-tab"
+                title="Trò chuyện AI"
+              >
+                <MessageSquare size={18} className={screen === "chat" ? "" : "animate-pulse"} />
+                <span className="text-[9px] mt-0.5 font-medium">Trợ lý</span>
+              </button>
+
+              {/* Notifications Tab */}
+              <button 
+                onClick={() => setScreen("notifications")}
+                className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer relative ${screen === "notifications" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
+                id="nav-notif-tab"
+                title="Thông báo"
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1.5 right-2 w-4 h-4 bg-red-500 border border-slate-900 text-[8px] font-bold text-white flex items-center justify-center rounded-full">
+                    {unreadCount}
+                  </span>
+                )}
+                <span className="text-[9px] mt-0.5 font-medium">Tin báo</span>
+              </button>
+
+              {/* Settings Tab */}
+              <button 
+                onClick={() => setScreen("settings")}
+                className={`flex flex-col items-center justify-center w-12 h-12 rounded-xl transition cursor-pointer ${screen === "settings" ? `${theme.text} bg-white/5` : "text-slate-400 hover:text-white"}`}
+                id="nav-settings-tab"
+                title="Cấu hình"
+              >
+                <Settings size={18} />
+                <span className="text-[9px] mt-0.5 font-medium">Cài đặt</span>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
