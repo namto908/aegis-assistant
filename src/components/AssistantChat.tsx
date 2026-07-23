@@ -17,12 +17,12 @@ interface AssistantChatProps {
 }
 
 interface UserMemory {
-  id: str;
-  category: str;
-  key: str;
-  value: str;
+  id: string;
+  category: string;
+  key: string;
+  value: string;
   confidence: number;
-  updated_at: str;
+  updated_at: string;
 }
 
 export default function AssistantChat({ 
@@ -243,7 +243,7 @@ ${JSON.stringify(servers.map(s => ({ name: s.name, status: s.status, uptime: s.u
 HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
 - Xưng hô thân thiện, chuyên nghiệp, gọi chủ nhân là "chủ nhân", "bạn" hoặc "anh/chị", xưng là "${assistantConfig.name}" hoặc "em".
 - Nếu chủ nhân gửi hình ảnh hoặc tập tin (văn bản/code/log), hãy phân tích kỹ các chi tiết nội dung được cung cấp và đưa ra nhận xét chuyên sâu phù hợp.
-- Nếu chủ nhân hỏi cần minh họa ảnh/sơ đồ hệ thống, bạn hãy đính kèm ảnh bằng cú pháp Markdown chuẩn: ![Mô tả ảnh](https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800) hoặc ảnh công nghệ phù hợp từ Unsplash.
+- TUYỆT ĐỐI KHÔNG tự tiện chèn ảnh Unsplash vào các câu trả lời thông thường. Chỉ chèn ảnh minh họa bằng cú pháp Markdown chuẩn: ![Mô tả ảnh](https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800) khi chủ nhân yêu cầu rõ ràng hoặc khi nội dung thực sự cần một hình ảnh kỹ thuật để giải thích trực quan.
 - Trả lời rõ ràng, sinh động, trình bày chuẩn Markdown (sử dụng tiêu đề ##, danh sách -, in đậm **text**, code block nếu cần). KHÔNG để lại các ký tự thô như *** trùng lặp không có ý nghĩa.
 - Trả lời bằng TIẾNG VIỆT hoàn toàn.
 `;
