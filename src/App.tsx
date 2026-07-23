@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Task, ServerStatus, Notification, AssistantConfig, ScreenType, GoogleUser } from "./types";
 import { getThemeClasses } from "./lib/theme";
+import { getApiBase } from "./lib/api";
 import Dashboard from "./components/Dashboard";
 import TasksList from "./components/TasksList";
 import NotificationsCenter from "./components/NotificationsCenter";
@@ -52,7 +53,7 @@ export default function App() {
   const prevServersRef = useRef<ServerStatus[]>([]);
   const prevNotificationsRef = useRef<Notification[]>([]);
 
-  const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:25530";
+  const apiBase = getApiBase(assistantConfig.apiBaseUrl);
 
   const changeScreen = (newScreen: ScreenType) => {
     const now = Date.now();

@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { Notification, ThemeColor, Task, ServerStatus, GoogleUser } from "../types";
 import { getThemeClasses } from "../lib/theme";
+import { getApiBase } from "../lib/api";
 
 interface NotificationsCenterProps {
   notifications: Notification[];
@@ -183,7 +184,7 @@ export default function NotificationsCenter({
   const triggerNewsPush = async (inputSignal?: AbortSignal) => {
     const signal = (inputSignal instanceof AbortSignal) ? inputSignal : undefined;
     setLoading(true);
-    const apiBase = (apiBaseUrl && apiBaseUrl.trim() !== "") ? apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:25530";
+    const apiBase = getApiBase(apiBaseUrl);
     const targetUrl = `${apiBase}/api/gemini/news`;
 
     setLoadingLogs([

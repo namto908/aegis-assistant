@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Task, ServerStatus, Notification, AssistantConfig, HomeLayoutVariant, ScreenType, GoogleUser } from "../types";
 import { getThemeClasses } from "../lib/theme";
+import { getApiBase } from "../lib/api";
 
 interface DashboardProps {
   tasks: Task[];
@@ -35,7 +36,7 @@ export default function Dashboard({ tasks, servers, notifications, assistantConf
     setIsLoadingBrief(true);
     setBriefError(null);
     try {
-      const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:25530";
+      const apiBase = getApiBase(assistantConfig.apiBaseUrl);
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (user) {
         headers["Authorization"] = `Bearer ${user.idToken}`;
