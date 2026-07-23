@@ -52,4 +52,5 @@ export interface Message {
   image?: string;
   file?: string;
   fileName?: string;
+  thinking?: string;
 }

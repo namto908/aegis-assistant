@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { 
   Send, Sparkles, AlertTriangle, User, Bot, Loader2, 
-  Image as ImageIcon, X, Trash2, Brain, Cpu, Plus, Check, RefreshCw, FileCode, Paperclip, MessageSquarePlus
+  Image as ImageIcon, X, Trash2, Brain, Cpu, Plus, Check, RefreshCw, FileCode, Paperclip, MessageSquarePlus, ChevronDown, ChevronUp
 } from "lucide-react";
 import { Message, AssistantConfig, Task, ServerStatus } from "../types";
 import { getThemeClasses } from "../lib/theme";
@@ -58,9 +58,33 @@ export default function AssistantChat({
   const [newMemKey, setNewMemKey] = useState("");
   const [newMemVal, setNewMemVal] = useState("");
 
+  const [expandedThinking, setExpandedThinking] = useState<Record<number, boolean>>({});
+  const [activeThinkingStep, setActiveThinkingStep] = useState(0);
+  const thinkingSteps = [
+    "🔍 Đang phân tích tin nhắn và các tệp đính kèm...",
+    "📂 Đang nạp đặc điểm và phong cách từ USER.md...",
+    "⚙️ Đang đọc quy tắc và tech stack từ MEMORY.md...",
+    "📊 Đang tổng hợp trạng thái các Servers & Taskboard...",
+    "🤖 Đang gửi ngữ cảnh tới Gemini để lập luận phản hồi..."
+  ];
+
   const chatEndRef = useRef<HTMLDivElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cycling active thinking indicator during generation
+  useEffect(() => {
+    let interval: any;
+    if (isTyping) {
+      setActiveThinkingStep(0);
+      interval = setInterval(() => {
+        setActiveThinkingStep((prev) => (prev + 1) % thinkingSteps.length);
+      }, 1600);
+    } else {
+      setActiveThinkingStep(0);
+    }
+    return () => clearInterval(interval);
+  }, [isTyping]);
 
   const apiBase = (assistantConfig.apiBaseUrl && assistantConfig.apiBaseUrl.trim() !== "") ? assistantConfig.apiBaseUrl.replace(/\/$/, "") : "http://192.168.2.200:3000";
 
@@ -78,7 +102,8 @@ export default function AssistantChat({
               timestamp: m.timestamp,
               image: m.image,
               file: m.file,
-              fileName: m.fileName
+              fileName: m.fileName,
+              thinking: m.thinking
             })));
           }
         }
@@ -280,6 +305,7 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
       const assistantMsg: Message = {
         role: "model",
         content: data.text,
+        thinking: data.thinking || undefined,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -500,6 +526,30 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
                     </div>
                   )}
 
+                  {/* Collapsible Thinking Log */}
+                  {msg.thinking && (
+                    <div className="mb-2.5 rounded-xl border border-white/10 bg-white/5 overflow-hidden">
+                      <button 
+                        onClick={() => setExpandedThinking(prev => ({ ...prev, [index]: !prev[index] }))}
+                        className="w-full px-3 py-1.5 flex items-center justify-between text-[10px] text-slate-400 hover:text-slate-200 transition"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <Cpu size={12} className="text-cyan-400 animate-pulse animate-duration-1000" />
+                          <span>Đã xem xét ngữ cảnh hệ thống</span>
+                        </div>
+                        <div className="flex items-center gap-1 font-mono text-[9px] text-slate-500">
+                          <span>{expandedThinking[index] ? "Thu gọn" : "Chi tiết"}</span>
+                          {expandedThinking[index] ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+                        </div>
+                      </button>
+                      {expandedThinking[index] && (
+                        <div className="px-3 pb-2.5 pt-1 text-[9.5px] text-slate-400 border-t border-white/5 font-mono whitespace-pre-wrap leading-relaxed">
+                          {msg.thinking}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Formatted Content */}
                   {renderFormattedContent(msg.content)}
                 </div>
@@ -515,14 +565,23 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
         {/* AI Typing Indicator */}
         {isTyping && (
           <div className="flex items-start gap-2.5">
-            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-900 border border-white/15 text-slate-400 flex-shrink-0 shadow-md">
-              <Loader2 size={14} className="animate-spin text-cyan-400" />
+            <div className="w-8 h-8 rounded-full flex items-center justify-center bg-slate-900 border border-white/15 text-slate-300 flex-shrink-0 shadow-md">
+              <img 
+                src={assistantConfig.avatarUrl || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=150"} 
+                alt="Assistant" 
+                className="w-full h-full object-cover rounded-full"
+                referrerPolicy="no-referrer"
+              />
             </div>
-            <div className="bg-slate-900/80 border border-white/10 p-3.5 rounded-2xl rounded-tl-xs backdrop-blur-md max-w-[85%]">
-              <div className="flex gap-1.5 items-center justify-center h-4 px-2">
-                <span className={`w-2 h-2 ${theme.bg} rounded-full animate-bounce`} style={{ animationDelay: "0ms" }}></span>
-                <span className={`w-2 h-2 ${theme.bg} rounded-full animate-bounce`} style={{ animationDelay: "150ms" }}></span>
-                <span className={`w-2 h-2 ${theme.bg} rounded-full animate-bounce`} style={{ animationDelay: "300ms" }}></span>
+            <div className="bg-slate-900/80 border border-white/10 p-3.5 rounded-2xl rounded-tl-xs backdrop-blur-md max-w-[85%] space-y-2 shadow-2xl">
+              <div className="flex items-center gap-2 text-[10px] text-cyan-400 font-medium">
+                <Cpu size={12} className="animate-spin text-cyan-400 shrink-0" />
+                <span className="animate-pulse">{thinkingSteps[activeThinkingStep]}</span>
+              </div>
+              <div className="flex gap-1 items-center h-2 px-1">
+                <span className={`w-1.5 h-1.5 ${theme.bg} rounded-full animate-bounce`} style={{ animationDelay: "0ms" }}></span>
+                <span className={`w-1.5 h-1.5 ${theme.bg} rounded-full animate-bounce`} style={{ animationDelay: "150ms" }}></span>
+                <span className={`w-1.5 h-1.5 ${theme.bg} rounded-full animate-bounce`} style={{ animationDelay: "300ms" }}></span>
               </div>
             </div>
           </div>
