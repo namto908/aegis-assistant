@@ -74,6 +74,9 @@ export default function App() {
       const configRes = await fetch(`${apiBase}/api/config`, { headers });
       if (configRes.ok) {
         const configData = await configRes.json();
+        if (Capacitor.isNativePlatform() && configData.apiBaseUrl && (configData.apiBaseUrl.includes("localhost") || configData.apiBaseUrl.includes("127.0.0.1"))) {
+          configData.apiBaseUrl = "";
+        }
         setAssistantConfig(configData);
       }
       

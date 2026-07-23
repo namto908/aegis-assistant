@@ -32,7 +32,8 @@ export default function Dashboard({ tasks, servers, notifications, assistantConf
   const upServersCount = servers.filter((s) => s.status === "up").length;
   const unreadNotifsCount = notifications.filter((n) => !n.read).length;
 
-  const generateAIBriefing = async (signal?: AbortSignal) => {
+  const generateAIBriefing = async (inputSignal?: any) => {
+    const signal = (inputSignal instanceof AbortSignal) ? inputSignal : undefined;
     setIsLoadingBrief(true);
     setBriefError(null);
     try {
