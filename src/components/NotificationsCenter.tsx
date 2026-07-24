@@ -21,18 +21,20 @@ interface NotificationsCenterProps {
   onDiscussWithChatbot?: (message: string) => void;
   apiBaseUrl?: string;
   user: GoogleUser | null;
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
-export default function NotificationsCenter({ 
-  notifications, 
-  setNotifications, 
+export default function NotificationsCenter({
+  notifications,
+  setNotifications,
   themeColor = "slate",
   tasks = [],
   servers = [],
   setScreen,
   onDiscussWithChatbot,
   apiBaseUrl,
-  user
+  user,
+  authFetch
 }: NotificationsCenterProps) {
   const [filter, setFilter] = useState<"all" | "unread">("all");
   
@@ -201,13 +203,9 @@ export default function NotificationsCenter({
     }, 800);
 
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (user) {
-        headers["Authorization"] = `Bearer ${user.idToken}`;
-      }
-      const response = await fetch(targetUrl, {
+      const response = await authFetch(targetUrl, {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         signal,
         body: JSON.stringify({
           topic,

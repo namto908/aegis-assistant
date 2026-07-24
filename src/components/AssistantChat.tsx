@@ -16,6 +16,7 @@ interface AssistantChatProps {
   prefillMessage?: string | null;
   clearPrefillMessage?: () => void;
   user: GoogleUser | null;
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
 interface UserMemory {
@@ -34,7 +35,8 @@ export default function AssistantChat({
   addNotification,
   prefillMessage,
   clearPrefillMessage,
-  user
+  user,
+  authFetch
 }: AssistantChatProps) {
   const theme = getThemeClasses(assistantConfig.themeColor || "slate");
   const defaultWelcomeMsg: Message = {
@@ -99,11 +101,7 @@ export default function AssistantChat({
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const headers: Record<string, string> = {};
-        if (user) {
-          headers["Authorization"] = `Bearer ${user.idToken}`;
-        }
-        const res = await fetch(`${apiBase}/api/gemini/history`, { headers });
+        const res = await authFetch(`${apiBase}/api/gemini/history`);
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data) && data.length > 0) {
@@ -144,11 +142,7 @@ export default function AssistantChat({
   const fetchMemories = async () => {
     setLoadingMemories(true);
     try {
-      const headers: Record<string, string> = {};
-      if (user) {
-        headers["Authorization"] = `Bearer ${user.idToken}`;
-      }
-      const res = await fetch(`${apiBase}/api/gemini/memories`, { headers });
+      const res = await authFetch(`${apiBase}/api/gemini/memories`);
       if (res.ok) {
         const data = await res.json();
         setMemories(data);
@@ -168,13 +162,9 @@ export default function AssistantChat({
   const handleAddMemory = async () => {
     if (!newMemKey.trim() || !newMemVal.trim()) return;
     try {
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (user) {
-        headers["Authorization"] = `Bearer ${user.idToken}`;
-      }
-      const res = await fetch(`${apiBase}/api/gemini/memories`, {
+      const res = await authFetch(`${apiBase}/api/gemini/memories`, {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ key: newMemKey.trim(), value: newMemVal.trim(), category: "preference" })
       });
       if (res.ok) {
@@ -189,11 +179,7 @@ export default function AssistantChat({
 
   const handleDeleteMemory = async (id: string) => {
     try {
-      const headers: Record<string, string> = {};
-      if (user) {
-        headers["Authorization"] = `Bearer ${user.idToken}`;
-      }
-      const res = await fetch(`${apiBase}/api/gemini/memories/${id}`, { method: "DELETE", headers });
+      const res = await authFetch(`${apiBase}/api/gemini/memories/${id}`, { method: "DELETE" });
       if (res.ok) {
         setMemories((prev) => prev.filter((m) => m.id !== id));
       }
@@ -205,11 +191,7 @@ export default function AssistantChat({
   const handleClearHistory = async () => {
     setMessages([defaultWelcomeMsg]);
     try {
-      const headers: Record<string, string> = {};
-      if (user) {
-        headers["Authorization"] = `Bearer ${user.idToken}`;
-      }
-      await fetch(`${apiBase}/api/gemini/history`, { method: "DELETE", headers });
+      await authFetch(`${apiBase}/api/gemini/history`, { method: "DELETE" });
     } catch (e) {
       console.error("Failed to clear history on backend", e);
     }
@@ -310,13 +292,9 @@ HƯỚNG DẪN TRẢ LỜI & TRÌNH BÀY MARKDOWN:
       }));
 
       const controller = new AbortController();
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (user) {
-        headers["Authorization"] = `Bearer ${user.idToken}`;
-      }
-      const response = await fetch(`${apiBase}/api/gemini/chat`, {
+      const response = await authFetch(`${apiBase}/api/gemini/chat`, {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
           messages: chatHistoryForGemini,

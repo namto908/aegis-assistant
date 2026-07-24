@@ -15,9 +15,10 @@ interface DashboardProps {
   assistantConfig: AssistantConfig;
   setScreen: (screen: ScreenType) => void;
   user: GoogleUser | null;
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
-export default function Dashboard({ tasks, servers, notifications, assistantConfig, setScreen, user }: DashboardProps) {
+export default function Dashboard({ tasks, servers, notifications, assistantConfig, setScreen, user, authFetch }: DashboardProps) {
   const [layout, setLayout] = useState<HomeLayoutVariant>("bento");
   const theme = getThemeClasses(assistantConfig.themeColor || "slate");
   const [briefing, setBriefing] = useState<string>(
@@ -38,13 +39,9 @@ export default function Dashboard({ tasks, servers, notifications, assistantConf
     setBriefError(null);
     try {
       const apiBase = getApiBase(assistantConfig.apiBaseUrl);
-      const headers: Record<string, string> = { "Content-Type": "application/json" };
-      if (user) {
-        headers["Authorization"] = `Bearer ${user.idToken}`;
-      }
-      const response = await fetch(`${apiBase}/api/gemini/briefing`, {
+      const response = await authFetch(`${apiBase}/api/gemini/briefing`, {
         method: "POST",
-        headers,
+        headers: { "Content-Type": "application/json" },
         signal,
         body: JSON.stringify({
           tasks,

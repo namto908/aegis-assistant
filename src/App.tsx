@@ -65,38 +65,96 @@ export default function App() {
     setScreenHistory((prev) => [...prev, newScreen]);
   };
 
+  // Decode a JWT's `exp` claim (ms since epoch) without any external dependency.
+  const decodeJwtExpiry = (token: string): number | null => {
+    try {
+      const payload = token.split(".")[1];
+      const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+      return typeof json.exp === "number" ? json.exp * 1000 : null;
+    } catch {
+      return null;
+    }
+  };
+
+  // Ask the Google Auth plugin for a fresh ID token using the existing session, without a full re-login.
+  const refreshGoogleToken = async (current: GoogleUser): Promise<GoogleUser | null> => {
+    try {
+      const refreshed = await GoogleAuth.refresh();
+      if (!refreshed?.idToken) return null;
+      const updated: GoogleUser = { ...current, idToken: refreshed.idToken };
+      localStorage.setItem("aegis_user", JSON.stringify(updated));
+      return updated;
+    } catch (e) {
+      console.error("Google token refresh failed:", e);
+      return null;
+    }
+  };
+
+  // Centralized authenticated fetch: retries once with a refreshed token on 401,
+  // and force-logs-out if the session truly can't be recovered.
+  const authFetchWithUser = async (
+    url: string,
+    options: RequestInit,
+    usr: GoogleUser
+  ): Promise<{ res: Response; user: GoogleUser }> => {
+    const doFetch = (token: string) =>
+      fetch(url, {
+        ...options,
+        headers: { ...(options.headers || {}), Authorization: `Bearer ${token}` }
+      });
+
+    let res = await doFetch(usr.idToken);
+    if (res.status === 401) {
+      const refreshed = await refreshGoogleToken(usr);
+      if (refreshed) {
+        res = await doFetch(refreshed.idToken);
+        if (res.status !== 401) {
+          setUser(refreshed);
+          return { res, user: refreshed };
+        }
+      }
+      console.warn("Session could not be refreshed, logging out.");
+      handleLogout();
+    }
+    return { res, user: usr };
+  };
+
+  // Simplified authFetch bound to the currently logged-in user, handed down to
+  // child screens so they don't have to build Authorization headers themselves.
+  const authFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
+    if (!user) throw new Error("authFetch called without a logged-in user");
+    const { res } = await authFetchWithUser(url, options, user);
+    return res;
+  };
+
   const fetchUserData = async (usr: GoogleUser) => {
     try {
-      const headers = {
-        "Authorization": `Bearer ${usr.idToken}`
-      };
-      
-      const configRes = await fetch(`${apiBase}/api/config`, { headers });
-      if (configRes.ok) {
-        const configData = await configRes.json();
+      const configRes = await authFetchWithUser(`${apiBase}/api/config`, {}, usr);
+      if (configRes.res.ok) {
+        const configData = await configRes.res.json();
         if (Capacitor.isNativePlatform() && configData.apiBaseUrl && (configData.apiBaseUrl.includes("localhost") || configData.apiBaseUrl.includes("127.0.0.1"))) {
           configData.apiBaseUrl = "";
         }
         setAssistantConfig(configData);
       }
-      
-      const tasksRes = await fetch(`${apiBase}/api/tasks`, { headers });
-      if (tasksRes.ok) {
-        const tasksData = await tasksRes.json();
+
+      const tasksRes = await authFetchWithUser(`${apiBase}/api/tasks`, {}, usr);
+      if (tasksRes.res.ok) {
+        const tasksData = await tasksRes.res.json();
         prevTasksRef.current = tasksData;
         setTasks(tasksData);
       }
-      
-      const serversRes = await fetch(`${apiBase}/api/servers`, { headers });
-      if (serversRes.ok) {
-        const serversData = await serversRes.json();
+
+      const serversRes = await authFetchWithUser(`${apiBase}/api/servers`, {}, usr);
+      if (serversRes.res.ok) {
+        const serversData = await serversRes.res.json();
         prevServersRef.current = serversData;
         setServers(serversData);
       }
-      
-      const notifsRes = await fetch(`${apiBase}/api/notifications`, { headers });
-      if (notifsRes.ok) {
-        const notifsData = await notifsRes.json();
+
+      const notifsRes = await authFetchWithUser(`${apiBase}/api/notifications`, {}, usr);
+      if (notifsRes.res.ok) {
+        const notifsData = await notifsRes.res.json();
         prevNotificationsRef.current = notifsData;
         setNotifications(notifsData);
       }
@@ -197,9 +255,25 @@ export default function App() {
     try {
       const storedUser = localStorage.getItem("aegis_user");
       if (storedUser) {
-        const parsedUser = JSON.parse(storedUser);
-        setUser(parsedUser);
-        fetchUserData(parsedUser);
+        const parsedUser: GoogleUser = JSON.parse(storedUser);
+
+        const loadWithFreshToken = async () => {
+          const expiry = decodeJwtExpiry(parsedUser.idToken);
+          // Refresh proactively if already expired or expiring within the next 5 minutes.
+          const needsRefresh = expiry === null || expiry - Date.now() < 5 * 60 * 1000;
+
+          let activeUser = parsedUser;
+          if (needsRefresh) {
+            const refreshed = await refreshGoogleToken(parsedUser);
+            if (refreshed) {
+              activeUser = refreshed;
+            }
+          }
+          setUser(activeUser);
+          fetchUserData(activeUser);
+        };
+
+        loadWithFreshToken();
       } else {
         const storedTasks = localStorage.getItem("aegis_tasks");
         const storedServers = localStorage.getItem("aegis_servers");
@@ -242,12 +316,9 @@ export default function App() {
     const sync = async () => {
       const deleted = prev.filter(p => !tasks.some(t => t.id === p.id));
       for (const d of deleted) {
-        await fetch(`${apiBase}/api/tasks/${d.id}`, {
-          method: "DELETE",
-          headers: { "Authorization": `Bearer ${user.idToken}` }
-        }).catch(err => console.error(err));
+        await authFetchWithUser(`${apiBase}/api/tasks/${d.id}`, { method: "DELETE" }, user).catch(err => console.error(err));
       }
-      
+
       const addedOrUpdated = tasks.filter(t => {
         const p = prev.find(prevTask => prevTask.id === t.id);
         return !p || JSON.stringify(p) !== JSON.stringify(t);
@@ -256,19 +327,16 @@ export default function App() {
         const p = prev.find(prevTask => prevTask.id === t.id);
         const method = p ? "PUT" : "POST";
         const url = p ? `${apiBase}/api/tasks/${t.id}` : `${apiBase}/api/tasks`;
-        await fetch(url, {
+        await authFetchWithUser(url, {
           method,
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${user.idToken}`
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(t)
-        }).catch(err => console.error(err));
+        }, user).catch(err => console.error(err));
       }
       prevTasksRef.current = tasks;
       localStorage.setItem("aegis_tasks", JSON.stringify(tasks));
     };
-    
+
     sync();
   }, [tasks, user, apiBase]);
 
@@ -283,12 +351,9 @@ export default function App() {
     const sync = async () => {
       const deleted = prev.filter(p => !servers.some(s => s.id === p.id));
       for (const d of deleted) {
-        await fetch(`${apiBase}/api/servers/${d.id}`, {
-          method: "DELETE",
-          headers: { "Authorization": `Bearer ${user.idToken}` }
-        }).catch(err => console.error(err));
+        await authFetchWithUser(`${apiBase}/api/servers/${d.id}`, { method: "DELETE" }, user).catch(err => console.error(err));
       }
-      
+
       const addedOrUpdated = servers.filter(s => {
         const p = prev.find(prevSrv => prevSrv.id === s.id);
         return !p || JSON.stringify(p) !== JSON.stringify(s);
@@ -297,19 +362,16 @@ export default function App() {
         const p = prev.find(prevSrv => prevSrv.id === s.id);
         const method = p ? "PUT" : "POST";
         const url = p ? `${apiBase}/api/servers/${s.id}` : `${apiBase}/api/servers`;
-        await fetch(url, {
+        await authFetchWithUser(url, {
           method,
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${user.idToken}`
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(s)
-        }).catch(err => console.error(err));
+        }, user).catch(err => console.error(err));
       }
       prevServersRef.current = servers;
       localStorage.setItem("aegis_servers", JSON.stringify(servers));
     };
-    
+
     sync();
   }, [servers, user, apiBase]);
 
@@ -324,12 +386,9 @@ export default function App() {
     const sync = async () => {
       const deleted = prev.filter(p => !notifications.some(n => n.id === p.id));
       for (const d of deleted) {
-        await fetch(`${apiBase}/api/notifications/${d.id}`, {
-          method: "DELETE",
-          headers: { "Authorization": `Bearer ${user.idToken}` }
-        }).catch(err => console.error(err));
+        await authFetchWithUser(`${apiBase}/api/notifications/${d.id}`, { method: "DELETE" }, user).catch(err => console.error(err));
       }
-      
+
       const addedOrUpdated = notifications.filter(n => {
         const p = prev.find(prevNotif => prevNotif.id === n.id);
         return !p || JSON.stringify(p) !== JSON.stringify(n);
@@ -338,26 +397,20 @@ export default function App() {
         const p = prev.find(prevNotif => prevNotif.id === n.id);
         if (p) {
           if (n.read && !p.read) {
-            await fetch(`${apiBase}/api/notifications/${n.id}/read`, {
-              method: "PUT",
-              headers: { "Authorization": `Bearer ${user.idToken}` }
-            }).catch(err => console.error(err));
+            await authFetchWithUser(`${apiBase}/api/notifications/${n.id}/read`, { method: "PUT" }, user).catch(err => console.error(err));
           }
         } else {
-          await fetch(`${apiBase}/api/notifications`, {
+          await authFetchWithUser(`${apiBase}/api/notifications`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${user.idToken}`
-            },
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify(n)
-          }).catch(err => console.error(err));
+          }, user).catch(err => console.error(err));
         }
       }
       prevNotificationsRef.current = notifications;
       localStorage.setItem("aegis_notifications", JSON.stringify(notifications));
     };
-    
+
     sync();
   }, [notifications, user, apiBase]);
 
@@ -365,14 +418,11 @@ export default function App() {
     if (!user) return;
     const syncConfig = async () => {
       try {
-        await fetch(`${apiBase}/api/config`, {
+        await authFetchWithUser(`${apiBase}/api/config`, {
           method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${user.idToken}`
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(assistantConfig)
-        });
+        }, user);
       } catch (e) {
         console.error("Failed to sync assistant config to backend:", e);
       }
@@ -465,13 +515,14 @@ export default function App() {
     switch (screen) {
       case "home":
         return (
-          <Dashboard 
-            tasks={tasks} 
-            servers={servers} 
-            notifications={notifications} 
+          <Dashboard
+            tasks={tasks}
+            servers={servers}
+            notifications={notifications}
             assistantConfig={assistantConfig}
             setScreen={setScreen}
             user={user}
+            authFetch={authFetch}
           />
         );
       case "tasks":
@@ -498,6 +549,7 @@ export default function App() {
             }}
             apiBaseUrl={assistantConfig.apiBaseUrl}
             user={user}
+            authFetch={authFetch}
           />
         );
       case "server":
@@ -519,6 +571,7 @@ export default function App() {
             prefillMessage={chatPrefill}
             clearPrefillMessage={() => setChatPrefill(null)}
             user={user}
+            authFetch={authFetch}
           />
         );
       case "settings":
