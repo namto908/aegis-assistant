@@ -316,6 +316,13 @@ export default function App() {
   }, []);
 
   // Declarative Backend Sync Effects
+  //
+  // NOTE on prevXRef: it's snapshotted to the CURRENT state synchronously, before the
+  // async sync() below awaits anything. If a second state update fires while sync() is
+  // still mid-flight (e.g. a notification gets marked read moments after being created,
+  // before its creation POST has finished), the next effect run must diff against the
+  // just-created item already being present in prev — otherwise it looks "new" again and
+  // gets POSTed a second time with the same id, which the backend rejects as a duplicate.
   useEffect(() => {
     if (!user) return;
     const prev = prevTasksRef.current;
@@ -323,7 +330,10 @@ export default function App() {
       prevTasksRef.current = tasks;
       return;
     }
-    
+
+    prevTasksRef.current = tasks;
+    localStorage.setItem("aegis_tasks", JSON.stringify(tasks));
+
     const sync = async () => {
       const deleted = prev.filter(p => !tasks.some(t => t.id === p.id));
       for (const d of deleted) {
@@ -344,8 +354,6 @@ export default function App() {
           body: JSON.stringify(t)
         }, user).catch(err => console.error(err));
       }
-      prevTasksRef.current = tasks;
-      localStorage.setItem("aegis_tasks", JSON.stringify(tasks));
     };
 
     sync();
@@ -358,7 +366,10 @@ export default function App() {
       prevServersRef.current = servers;
       return;
     }
-    
+
+    prevServersRef.current = servers;
+    localStorage.setItem("aegis_servers", JSON.stringify(servers));
+
     const sync = async () => {
       const deleted = prev.filter(p => !servers.some(s => s.id === p.id));
       for (const d of deleted) {
@@ -379,8 +390,6 @@ export default function App() {
           body: JSON.stringify(s)
         }, user).catch(err => console.error(err));
       }
-      prevServersRef.current = servers;
-      localStorage.setItem("aegis_servers", JSON.stringify(servers));
     };
 
     sync();
@@ -393,7 +402,10 @@ export default function App() {
       prevNotificationsRef.current = notifications;
       return;
     }
-    
+
+    prevNotificationsRef.current = notifications;
+    localStorage.setItem("aegis_notifications", JSON.stringify(notifications));
+
     const sync = async () => {
       const deleted = prev.filter(p => !notifications.some(n => n.id === p.id));
       for (const d of deleted) {
@@ -418,8 +430,6 @@ export default function App() {
           }, user).catch(err => console.error(err));
         }
       }
-      prevNotificationsRef.current = notifications;
-      localStorage.setItem("aegis_notifications", JSON.stringify(notifications));
     };
 
     sync();
