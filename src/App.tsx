@@ -53,6 +53,14 @@ export default function App() {
   const prevServersRef = useRef<ServerStatus[]>([]);
   const prevNotificationsRef = useRef<Notification[]>([]);
 
+  // Lets a child screen (e.g. a full-screen detail panel inside NotificationsCenter)
+  // claim the hardware back button to close its own overlay first, instead of the
+  // global handler always navigating the screen stack underneath it.
+  const modalBackHandlerRef = useRef<(() => boolean) | null>(null);
+  const registerModalBackHandler = (handler: (() => boolean) | null) => {
+    modalBackHandlerRef.current = handler;
+  };
+
   const apiBase = getApiBase(assistantConfig.apiBaseUrl);
 
   const changeScreen = (newScreen: ScreenType) => {
@@ -220,6 +228,9 @@ export default function App() {
     StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
 
     const backListenerPromise = CapApp.addListener("backButton", () => {
+      if (modalBackHandlerRef.current && modalBackHandlerRef.current()) {
+        return;
+      }
       if (screen !== "home" && screenHistory.length > 1) {
         setScreenHistory((prev) => {
           const newHistory = [...prev];
@@ -550,6 +561,7 @@ export default function App() {
             apiBaseUrl={assistantConfig.apiBaseUrl}
             user={user}
             authFetch={authFetch}
+            registerModalBackHandler={registerModalBackHandler}
           />
         );
       case "server":

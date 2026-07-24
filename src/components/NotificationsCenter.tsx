@@ -22,6 +22,7 @@ interface NotificationsCenterProps {
   apiBaseUrl?: string;
   user: GoogleUser | null;
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
+  registerModalBackHandler?: (handler: (() => boolean) | null) => void;
 }
 
 export default function NotificationsCenter({
@@ -34,7 +35,8 @@ export default function NotificationsCenter({
   onDiscussWithChatbot,
   apiBaseUrl,
   user,
-  authFetch
+  authFetch,
+  registerModalBackHandler
 }: NotificationsCenterProps) {
   const [filter, setFilter] = useState<"all" | "unread">("all");
   
@@ -128,6 +130,31 @@ export default function NotificationsCenter({
       notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
     );
   };
+
+  // A briefing counts as "read" the moment its detail panel is actually open —
+  // covers both a manual click in the list AND the panel auto-opening right
+  // after a fresh push (previously that path never marked itself read).
+  useEffect(() => {
+    if (selectedNews && !selectedNews.read) {
+      markAsRead(selectedNews.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedNews?.id]);
+
+  // Let the Android hardware back button close this detail panel instead of
+  // navigating away from the whole Notifications screen underneath it.
+  useEffect(() => {
+    if (!registerModalBackHandler) return;
+    if (selectedNews) {
+      registerModalBackHandler(() => {
+        setSelectedNews(null);
+        return true;
+      });
+    } else {
+      registerModalBackHandler(null);
+    }
+    return () => registerModalBackHandler(null);
+  }, [selectedNews, registerModalBackHandler]);
 
   const markAllAsRead = () => {
     setNotifications(notifications.map((n) => ({ ...n, read: true })));
@@ -227,13 +254,14 @@ export default function NotificationsCenter({
         const notifTitle = data.title || "Bản tin công nghệ Aegis mới nhất";
         const notifDesc = data.description || "Cập nhật mới nhất từ hệ thống AI";
 
+        const now = new Date();
         const newNotif: Notification = {
           id: "news_" + Date.now(),
           title: notifTitle,
           description: notifDesc,
           category: "news",
           read: false,
-          timestamp: scheduleTime,
+          timestamp: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
           contentDetail: data.contentDetail,
           sourceUrl: data.sourceUrl
         };
@@ -454,9 +482,11 @@ export default function NotificationsCenter({
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: 20 }}
                   onClick={(e) => {
-                    markAsRead(notif.id, e);
                     if (notif.category === "news") {
+                      // Opening the detail panel marks it read (see the selectedNews effect above).
                       setSelectedNews(notif);
+                    } else {
+                      markAsRead(notif.id, e);
                     }
                   }}
                   className={`glass-card rounded-2xl p-3.5 border-l-4 transition-all duration-200 cursor-pointer ${
